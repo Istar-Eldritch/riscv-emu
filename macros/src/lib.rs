@@ -15,11 +15,11 @@ impl Parse for MaskInput {
 pub fn mask(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as MaskInput);
     let n: u32 = args.0.base10_digits().parse().unwrap();
-    let mut mask = 0;
+    let mut mask: u32 = 0;
     for _ in 0..n {
         mask = mask << 1;
         mask = mask + 1;
     }
-    let generated = quote!(#n);
+    let generated = quote!(#mask);
     TokenStream::from(generated)
 }

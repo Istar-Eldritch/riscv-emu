@@ -33,3 +33,13 @@ struct Instruction<F> {
     name: &'static str,
     operation: fn(cpu: &mut CPU, &mut Memory, word: F) -> (),
 }
+
+#[cfg(test)]
+mod tests {
+    use macros::mask;
+    #[test]
+    fn mask_macro_works() {
+        let m = mask!(3);
+        assert_eq!(m, 0b111);
+    }
+}
