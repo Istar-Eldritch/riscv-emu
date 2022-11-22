@@ -1,6 +1,6 @@
 use macros::mask;
 
-const OPCODE_MASK: u32 = mask!(7);
+pub const OPCODE_MASK: u32 = mask!(7);
 const RD_MASK: u32 = mask!(5) << 7;
 const FUNCT3_MASK: u32 = mask!(3) << 12;
 const RS1_MASK: u32 = mask!(5) << 15;
@@ -33,10 +33,10 @@ impl From<u32> for RFormat {
 }
 
 pub struct IFormat {
-    rd: u32,
-    funct3: u32,
-    rs1: u32,
-    imm: u32,
+    pub rd: u32,
+    pub funct3: u32,
+    pub rs1: u32,
+    pub imm: u32,
 }
 
 impl From<u32> for IFormat {
@@ -52,11 +52,11 @@ impl From<u32> for IFormat {
 }
 
 pub struct SFormat {
-    imm0: u32,
-    funct3: u32,
-    rs1: u32,
-    rs2: u32,
-    imm1: u32,
+    pub imm0: u32,
+    pub funct3: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub imm1: u32,
 }
 
 impl From<u32> for SFormat {
@@ -72,13 +72,13 @@ impl From<u32> for SFormat {
 }
 
 pub struct BFormat {
-    imm0: u32,
-    imm1: u32,
-    funct3: u32,
-    rs1: u32,
-    rs2: u32,
-    imm2: u32,
-    imm3: u32,
+    pub imm0: u32,
+    pub imm1: u32,
+    pub funct3: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub imm2: u32,
+    pub imm3: u32,
 }
 
 impl From<u32> for BFormat {
@@ -96,8 +96,8 @@ impl From<u32> for BFormat {
 }
 
 pub struct UFormat {
-    rd: u32,
-    imm: u32,
+    pub rd: u32,
+    pub imm: u32,
 }
 
 impl From<u32> for UFormat {
@@ -110,11 +110,11 @@ impl From<u32> for UFormat {
 }
 
 pub struct JFormat {
-    rd: u32,
-    imm0: u32,
-    imm1: u32,
-    imm2: u32,
-    imm3: u32,
+    pub rd: u32,
+    pub imm0: u32,
+    pub imm1: u32,
+    pub imm2: u32,
+    pub imm3: u32,
 }
 
 impl From<u32> for JFormat {
