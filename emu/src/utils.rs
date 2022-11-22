@@ -39,7 +39,7 @@ fn msb(n: u32) -> u32 {
 
 // sign extension
 // https://en.wikipedia.org/wiki/Sign_extension
-fn sext(n: u32, from: u32, to: u32) -> u32 {
+pub fn sext(n: u32, from: u32, to: u32) -> u32 {
     let shift = to - from;
     let n = n << shift;
     let n: i32 = unsafe { transmute(n) };
