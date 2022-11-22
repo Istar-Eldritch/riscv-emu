@@ -1,5 +1,9 @@
 mod format;
+mod memory;
+mod rv32i;
 mod utils;
+
+use memory::Memory;
 
 pub struct Emulator {
     cpu: CPU,
@@ -15,23 +19,27 @@ pub struct CPU {
     // program counter
     pc: u32,
     // x regisers, ignoring x0
-    registers: [u32; 32],
+    x_registers: [u32; 32],
 }
 
 impl CPU {
     pub fn new() -> Self {
         CPU {
             pc: 0,
-            registers: [0; 32],
+            x_registers: [0; 32],
         }
     }
 }
 
-pub struct Memory();
+pub struct Instruction {
+    opcode: u32,
+    op: fn(cpu: &mut CPU, &mut Memory, word: u32) -> (),
+}
 
-struct Instruction<F> {
-    name: &'static str,
-    operation: fn(cpu: &mut CPU, &mut Memory, word: F) -> (),
+impl Instruction {
+    pub fn new(opcode: u32, op: fn(cpu: &mut CPU, &mut Memory, word: u32) -> ()) -> Self {
+        Instruction { opcode, op }
+    }
 }
 
 #[cfg(test)]
