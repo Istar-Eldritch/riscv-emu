@@ -13,11 +13,11 @@ pub fn opcode(v: u32) -> u32 {
 
 #[derive(Debug)]
 pub struct RFormat {
-    rd: u32,
-    funct3: u32,
-    rs1: u32,
-    rs2: u32,
-    funct7: u32,
+    pub rd: u32,
+    pub funct3: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub funct7: u32,
 }
 
 impl From<u32> for RFormat {

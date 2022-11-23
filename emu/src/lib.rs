@@ -17,16 +17,19 @@ impl Emulator {
 
 pub struct CPU {
     // program counter
-    pc: u32,
+    pub pc: u32,
     // x regisers, ignoring x0
-    x_registers: [u32; 32],
+    pub x: [u32; 32],
+    // csr registers
+    pub csr: [u32; 0x0b3], // TODO: Implement only the CSRs I want.
 }
 
 impl CPU {
     pub fn new() -> Self {
         CPU {
             pc: 0,
-            x_registers: [0; 32],
+            x: [0; 32],
+            csr: [0; 0x0b3],
         }
     }
 }

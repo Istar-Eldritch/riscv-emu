@@ -2,7 +2,7 @@ use register_interface::*;
 use std::mem::transmute;
 
 /// most significant bit
-fn msb(n: u32) -> u32 {
+pub fn msb(n: u32) -> u32 {
     // Below steps set bits after
     // MSB (including MSB)
     let mut n = n;
@@ -33,7 +33,7 @@ fn msb(n: u32) -> u32 {
     //     n & (1 << ((sizeof(n) * CHAR_BIT)-1))
     // and OR its value with the naive approach:
     //     ((n + 1) >> 1)
-    n = ((n + 1) >> 1) | (n & (1 << (32 * 8) - 1));
+    n = ((n + 1) >> 1) | (n & (1 << (4 * 8) - 1));
     return n;
 }
 
@@ -52,9 +52,16 @@ mod tests {
     use super::*;
     #[test]
     fn sext_pos() {
-        let n = 0b1010;
+        let n = 0b01010;
         let expected: u32 = 0b1111_1111_1111_1111_1111_1111_1111_1010;
         let s = sext(n, 4, 32);
         assert_eq!(s, expected)
+    }
+
+    #[test]
+    fn msb_test() {
+        let n = 0b10100;
+        let s = msb(n);
+        assert_eq!(s, 2_u32.pow(4));
     }
 }
