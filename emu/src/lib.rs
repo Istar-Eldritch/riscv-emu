@@ -4,14 +4,44 @@ mod rv32i;
 mod utils;
 
 use memory::Memory;
+use rv32i::rv32i;
+
+#[derive(Debug)]
+pub enum CPUException {
+    UnrecognizedInstruction,
+    EnvironmentCall,
+    Breakpoint,
+}
 
 pub struct Emulator {
     cpu: CPU,
+    mem: Memory,
 }
 
 impl Emulator {
-    fn new() -> Self {
-        Emulator { cpu: CPU::new() }
+    pub fn new(mem_capacity: u32) -> Self {
+        Emulator {
+            cpu: CPU::new(),
+            mem: Memory::new(mem_capacity),
+        }
+    }
+
+    pub fn flash(&mut self, mem: Vec<u8>) {
+        for i in 0..mem.len() {
+            self.mem.wb(i as u32, mem[i]);
+        }
+    }
+
+    fn run_instruction(&mut self, word: u32) -> Result<(), CPUException> {
+        rv32i(&mut self.cpu, &mut self.mem, word)
+    }
+
+    pub fn run_program(&mut self) -> Result<(), CPUException> {
+        loop {
+            let pc = self.cpu.pc;
+            let word = self.mem.rw(pc);
+            self.run_instruction(word)?;
+        }
     }
 }
 
@@ -31,17 +61,6 @@ impl CPU {
             x: [0; 32],
             csr: [0; 0x0b3],
         }
-    }
-}
-
-pub struct Instruction {
-    opcode: u32,
-    op: fn(cpu: &mut CPU, &mut Memory, word: u32) -> (),
-}
-
-impl Instruction {
-    pub fn new(opcode: u32, op: fn(cpu: &mut CPU, &mut Memory, word: u32) -> ()) -> Self {
-        Instruction { opcode, op }
     }
 }
 
