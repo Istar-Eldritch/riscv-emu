@@ -1,31 +1,23 @@
-use super::{Memory, CPU};
+use super::{CPUException, Memory, CPU};
 use crate::format::*;
 use crate::utils::*;
-use macros::mask;
-
-#[derive(Debug)]
-pub enum CPUException {
-    UnrecognizedInstruction,
-    EnvironmentCall,
-    Breakpoint,
-}
 
 /// Load Upper Immediate
-fn lui(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
+fn lui(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Result<(), CPUException> {
     let parsed = UFormat::try_from(word).unwrap(); // TODO: Handle trap
     cpu.x[parsed.rd as usize] = sext(parsed.imm << 12, 20, 32);
     Ok(())
 }
 
 /// Add Upper Immediate to PC
-fn auipc(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
+fn auipc(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Result<(), CPUException> {
     let parsed = UFormat::try_from(word).unwrap();
     cpu.x[parsed.rd as usize] = cpu.pc + sext(parsed.imm << 12, 20, 32);
     Ok(())
 }
 
 /// Jump and Link
-fn jal(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
+fn jal(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Result<(), CPUException> {
     let parsed = JFormat::try_from(word).unwrap();
     cpu.x[parsed.rd as usize] = cpu.pc + 4;
     cpu.pc += sext(
@@ -37,7 +29,7 @@ fn jal(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
 }
 
 /// Jump and Link Register
-fn jalr(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
+fn jalr(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Result<(), CPUException> {
     let parsed = IFormat::try_from(word).unwrap();
     cpu.pc = (cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32)) & !1;
     let addr = if parsed.rd == 0 { 1 } else { parsed.rd };
@@ -45,7 +37,7 @@ fn jalr(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> 
     Ok(())
 }
 
-fn beq(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn beq(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if cpu.x[word.rs1 as usize] == cpu.x[word.rs2 as usize] {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -56,7 +48,7 @@ fn beq(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUExceptio
     Ok(())
 }
 
-fn bge(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn bge(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if cpu.x[word.rs1 as usize] as i32 >= cpu.x[word.rs2 as usize] as i32 {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -67,7 +59,7 @@ fn bge(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUExceptio
     Ok(())
 }
 
-fn bgeu(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn bgeu(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if cpu.x[word.rs1 as usize] >= cpu.x[word.rs2 as usize] {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -78,7 +70,7 @@ fn bgeu(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUExcepti
     Ok(())
 }
 
-fn blt(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn blt(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if (cpu.x[word.rs1 as usize] as i32) < cpu.x[word.rs2 as usize] as i32 {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -89,7 +81,7 @@ fn blt(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUExceptio
     Ok(())
 }
 
-fn bltu(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn bltu(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if cpu.x[word.rs1 as usize] < cpu.x[word.rs2 as usize] {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -101,7 +93,7 @@ fn bltu(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUExcepti
     Ok(())
 }
 
-fn bne(cpu: &mut CPU, mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
+fn bne(cpu: &mut CPU, _mem: &mut Memory, word: BFormat) -> Result<(), CPUException> {
     if cpu.x[word.rs1 as usize] != cpu.x[word.rs2 as usize] {
         cpu.pc += sext(
             word.imm0 << 10 | word.imm1 | word.imm2 << 4 | word.imm3 << 11,
@@ -129,37 +121,37 @@ fn branch(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException
 
 fn lb(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rb(addr as usize) as u32, 8, 32);
+    cpu.x[parsed.rd as usize] = sext(mem.rb(addr) as u32, 8, 32);
     Ok(())
 }
 
 fn lbu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rb(addr as usize) as u32;
+    cpu.x[parsed.rd as usize] = mem.rb(addr) as u32;
     Ok(())
 }
 
 fn lh(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rhw(addr as usize) as u32, 16, 32);
+    cpu.x[parsed.rd as usize] = sext(mem.rhw(addr) as u32, 16, 32);
     Ok(())
 }
 
 fn lhu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rhw(addr as usize) as u32;
+    cpu.x[parsed.rd as usize] = mem.rhw(addr) as u32;
     Ok(())
 }
 
 fn lw(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rw(addr as usize) as u32, 32, 32);
+    cpu.x[parsed.rd as usize] = sext(mem.rw(addr) as u32, 32, 32);
     Ok(())
 }
 
 fn lwu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rw(addr as usize) as u32;
+    cpu.x[parsed.rd as usize] = mem.rw(addr) as u32;
     Ok(())
 }
 
@@ -179,19 +171,19 @@ fn load(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> 
 
 fn sb(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.wb(addr as usize, cpu.x[parsed.rs2 as usize] as u8);
+    mem.wb(addr, cpu.x[parsed.rs2 as usize] as u8);
     Ok(())
 }
 
 fn sh(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.whw(addr as usize, cpu.x[parsed.rs2 as usize] as u16);
+    mem.whw(addr, cpu.x[parsed.rs2 as usize] as u16);
     Ok(())
 }
 
 fn sw(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat) -> Result<(), CPUException> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.ww(addr as usize, cpu.x[parsed.rs2 as usize]);
+    mem.ww(addr, cpu.x[parsed.rs2 as usize]);
     Ok(())
 }
 
@@ -206,12 +198,12 @@ fn store(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException>
     op(cpu, mem, parsed)
 }
 
-fn addi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn addi(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(sext(parsed.imm, 12, 32));
     Ok(())
 }
 
-fn slti(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn slti(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let v = if (cpu.x[parsed.rs1 as usize] as i32) < sext(parsed.imm, 12, 32) as i32 {
         1
     } else {
@@ -223,7 +215,7 @@ fn slti(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUExce
     Ok(())
 }
 
-fn sltiu(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn sltiu(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let v = if cpu.x[parsed.rs1 as usize] < sext(parsed.imm, 12, 32) {
         1
     } else {
@@ -235,28 +227,28 @@ fn sltiu(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUExc
     Ok(())
 }
 
-fn xori(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn xori(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] ^ sext(cpu.x[parsed.imm as usize], 12, 32);
 
     Ok(())
 }
 
-fn ori(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn ori(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] | sext(cpu.x[parsed.imm as usize], 12, 32);
 
     Ok(())
 }
 
-fn andi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn andi(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] & sext(cpu.x[parsed.imm as usize], 12, 32);
 
     Ok(())
 }
 
-fn slli(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn slli(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shl(shamt);
@@ -264,7 +256,7 @@ fn slli(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUExce
     Ok(())
 }
 
-fn srli(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn srli(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shr(shamt);
@@ -272,7 +264,7 @@ fn srli(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUExce
     Ok(())
 }
 
-fn srai(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn srai(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let shamt = parsed.imm & 0b11111;
     let rs1 = cpu.x[parsed.rs1 as usize];
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
@@ -298,23 +290,23 @@ fn immediate(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcept
     op(cpu, mem, parsed)
 }
 
-fn add(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn add(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(cpu.x[parsed.rs2 as usize]);
     Ok(())
 }
 
-fn sub(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn sub(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_sub(cpu.x[parsed.rs2 as usize]);
     Ok(())
 }
 
-fn sll(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn sll(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize].wrapping_shl(cpu.x[parsed.rs2 as usize] & 0b11111);
     Ok(())
 }
 
-fn slt(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn slt(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     let v = if (cpu.x[parsed.rs1 as usize] as i32) < cpu.x[parsed.rs2 as usize] as i32 {
         1
     } else {
@@ -325,7 +317,7 @@ fn slt(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUExcept
     Ok(())
 }
 
-fn sltu(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn sltu(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     let v = if cpu.x[parsed.rs1 as usize] < cpu.x[parsed.rs2 as usize] {
         1
     } else {
@@ -336,12 +328,12 @@ fn sltu(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUExcep
     Ok(())
 }
 
-fn xor(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn xor(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] ^ cpu.x[parsed.rs2 as usize];
     Ok(())
 }
 
-fn srl(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn srl(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize].wrapping_shr(cpu.x[parsed.rs2 as usize] & 0b11111);
     Ok(())
@@ -355,12 +347,12 @@ fn sra(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUExcep
     Ok(())
 }
 
-fn or(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn or(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] | cpu.x[parsed.rs2 as usize];
     Ok(())
 }
 
-fn and(cpu: &mut CPU, mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
+fn and(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] & cpu.x[parsed.rs2 as usize];
     Ok(())
 }
@@ -374,7 +366,8 @@ fn arithmetic(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcep
         0b010 => slt,
         0b011 => sltu,
         0b100 => xor,
-        0b101 => srl,
+        0b101 if parsed.funct7 == 0 => srl,
+        0b101 => sra,
         0b110 => or,
         0b111 => and,
         _ => return Err(CPUException::UnrecognizedInstruction),
@@ -382,46 +375,46 @@ fn arithmetic(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcep
     op(cpu, mem, parsed)
 }
 
-fn fence(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
+fn fence(_cpu: &mut CPU, _mem: &mut Memory, _word: u32) -> Result<(), CPUException> {
     // No need to do anything given we do not reorder memroy writes / loads
     Ok(())
 }
 
-fn csrrw(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrw(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
     cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize];
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
-fn csrrs(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrs(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
     cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] | t;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
-fn csrrc(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrc(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
     cpu.csr[parsed.imm as usize] = t & !cpu.x[parsed.rs1 as usize];
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
-fn csrrwi(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrwi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     cpu.x[parsed.rd as usize] = cpu.csr[parsed.imm as usize] as u32;
     cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] & 0b11111;
     Ok(())
 }
 
-fn csrrsi(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrsi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
     cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] & 0b11111 | t;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
-fn csrrci(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
+fn csrrci(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
     cpu.csr[parsed.imm as usize] = t & !(cpu.x[parsed.rs1 as usize] & 0b11111);
     cpu.x[parsed.rd as usize] = t as u32;
@@ -447,7 +440,7 @@ fn system(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException
 }
 
 pub fn rv32i(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> {
-    let opcode = word & OPCODE_MASK;
+    let opcode = opcode(word);
     let op = match opcode {
         0b0110111 => lui,
         0b0010111 => auipc,
