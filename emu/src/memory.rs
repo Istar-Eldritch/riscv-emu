@@ -2,7 +2,6 @@ use std::alloc::{self, Layout};
 use std::ptr::{read_volatile, write_volatile};
 
 pub struct Memory {
-    #[allow(dead_code)]
     size: u32, // size in bytes
     addr: *mut u8,
 }
@@ -12,6 +11,10 @@ impl Memory {
     pub fn new(size: u32) -> Self {
         let addr = unsafe { alloc::alloc(Layout::from_size_align(size as usize, 4).unwrap()) };
         Memory { size, addr }
+    }
+
+    pub fn size(&self) -> u32 {
+        self.size
     }
 
     pub fn rb(&self, addr: u32) -> u8 {
