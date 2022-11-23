@@ -389,7 +389,7 @@ fn fence(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException>
 
 fn csrrw(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
     let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] as u16;
+    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize];
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
