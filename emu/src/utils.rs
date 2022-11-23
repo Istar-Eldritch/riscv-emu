@@ -1,7 +1,7 @@
-use register_interface::*;
 use std::mem::transmute;
 
 /// most significant bit
+#[allow(dead_code)]
 pub fn msb(n: u32) -> u32 {
     // Below steps set bits after
     // MSB (including MSB)
