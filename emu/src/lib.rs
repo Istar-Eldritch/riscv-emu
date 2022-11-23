@@ -62,7 +62,24 @@ impl Emulator {
     }
 
     fn run_instruction(&mut self, word: u32) -> Result<(), CPUException> {
-        rv32i(&mut self.cpu, &mut self.mem, word)?;
+        match rv32i(&mut self.cpu, &mut self.mem, word) {
+            Err(exc) => {
+                let cause = exc as u32;
+                self.cpu.set_csr(CSRs::mcause as u32, cause).unwrap();
+                let mtvec = self.cpu.get_csr(CSRs::mtvec as u32).unwrap();
+                let mode = mtvec & 0b11;
+                let base = (mtvec & !0b11) >> 2;
+                let pcv = if mode == 0 {
+                    base
+                } else {
+                    base + (4 * cause as u32)
+                };
+                self.cpu.set_csr(CSRs::mepc as u32, self.cpu.pc).unwrap();
+
+                self.cpu.pc = pcv;
+            }
+            _ => (),
+        };
         self.cpu.pc += 4;
         Ok(())
     }
