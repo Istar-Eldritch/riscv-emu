@@ -109,12 +109,12 @@ fn branch(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException
     let parsed = BFormat::try_from(word).unwrap();
     let op = match parsed.funct3 {
         0b000 => beq,
-        0b101 => bge,                                           // bge
-        0b111 => bgeu,                                          // bgeu
-        0b100 => blt,                                           // blt
-        0b110 => bltu,                                          // bltu
-        0b001 => bne,                                           // bne
-        _ => return Err(CPUException::UnrecognizedInstruction), // TODO: Trap
+        0b101 => bge,                                      // bge
+        0b111 => bgeu,                                     // bgeu
+        0b100 => blt,                                      // blt
+        0b110 => bltu,                                     // bltu
+        0b001 => bne,                                      // bne
+        _ => return Err(CPUException::IllegalInstruction), // TODO: Trap
     };
     op(cpu, mem, parsed)
 }
@@ -164,7 +164,7 @@ fn load(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException> 
         0b101 => lhu,
         0b010 => lw,
         0b110 => lwu,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
     op(cpu, mem, parsed)
 }
@@ -193,7 +193,7 @@ fn store(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException>
         0b000 => sb,
         0b001 => sh,
         0b010 => sw,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
     op(cpu, mem, parsed)
 }
@@ -285,7 +285,7 @@ fn immediate(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcept
         0b001 => slli,
         0b101 if parsed.imm & (0b111111 << 11) == 0 => srli,
         0b101 => srai,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
     op(cpu, mem, parsed)
 }
@@ -370,7 +370,7 @@ fn arithmetic(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcep
         0b101 => sra,
         0b110 => or,
         0b111 => and,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
     op(cpu, mem, parsed)
 }
@@ -381,42 +381,41 @@ fn fence(_cpu: &mut CPU, _mem: &mut Memory, _word: u32) -> Result<(), CPUExcepti
 }
 
 fn csrrw(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize];
+    let t = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize])?;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
 fn csrrs(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] | t;
+    let t = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] | t)?;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
 fn csrrc(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = t & !cpu.x[parsed.rs1 as usize];
+    let t = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, t & !cpu.x[parsed.rs1 as usize])?;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
 fn csrrwi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    cpu.x[parsed.rd as usize] = cpu.csr[parsed.imm as usize] as u32;
-    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] & 0b11111;
-    Ok(())
+    cpu.x[parsed.rd as usize] = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] & 0b11111)
 }
 
 fn csrrsi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = cpu.x[parsed.rs1 as usize] & 0b11111 | t;
+    let t = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] & 0b11111 | t)?;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
 
 fn csrrci(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat) -> Result<(), CPUException> {
-    let t = cpu.csr[parsed.imm as usize];
-    cpu.csr[parsed.imm as usize] = t & !(cpu.x[parsed.rs1 as usize] & 0b11111);
+    let t = cpu.get_csr(parsed.imm)?;
+    cpu.set_csr(parsed.imm, t & !(cpu.x[parsed.rs1 as usize] & 0b11111))?;
     cpu.x[parsed.rd as usize] = t as u32;
     Ok(())
 }
@@ -425,7 +424,7 @@ fn system(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException
     let parsed = IFormat::from(word);
 
     let op = match parsed.funct3 {
-        0b000 if parsed.imm == 0 => return Err(CPUException::EnvironmentCall),
+        0b000 if parsed.imm == 0 => return Err(CPUException::UEnvironmentCall),
         0b000 if parsed.imm == 1 => return Err(CPUException::Breakpoint),
         0b001 => csrrw,
         0b010 => csrrs,
@@ -433,7 +432,7 @@ fn system(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUException
         0b101 => csrrwi,
         0b110 => csrrsi,
         0b111 => csrrci,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
 
     op(cpu, mem, parsed)
@@ -453,7 +452,7 @@ pub fn rv32i(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Result<(), CPUExcept
         0b0110011 => arithmetic,
         0b0001111 => fence,
         0b1110011 => system,
-        _ => return Err(CPUException::UnrecognizedInstruction),
+        _ => return Err(CPUException::IllegalInstruction),
     };
 
     op(cpu, mem, word)
