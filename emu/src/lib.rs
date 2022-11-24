@@ -3,7 +3,7 @@ mod memory;
 mod rv32i;
 mod utils;
 
-use memory::{GenericMemory, Memory};
+use memory::{Memory, MMU};
 use rv32i::rv32i;
 
 #[derive(Debug)]
@@ -63,10 +63,10 @@ pub fn exception(cpu: &mut CPU, exc: CPUException, extra: u32) {
 }
 
 impl Emulator {
-    pub fn new(mem_capacity: u32, speed: u32) -> Self {
+    pub fn new(_mem_capacity: u32, speed: u32) -> Self {
         Emulator {
             cpu: CPU::new(),
-            mem: Box::new(GenericMemory::new(mem_capacity)),
+            mem: Box::new(MMU::new()),
             speed,
         }
     }
@@ -78,6 +78,7 @@ impl Emulator {
     }
 
     fn run_instruction(&mut self, word: u32) -> Result<(), CPUException> {
+        println!("run");
         match rv32i(&mut self.cpu, &mut *self.mem, word) {
             Some(v) => {
                 self.cpu.pc += 4;
