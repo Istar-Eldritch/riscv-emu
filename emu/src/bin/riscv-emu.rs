@@ -20,9 +20,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mem: Vec<u8> = Vec::new();
     br.read_to_end(&mut mem)?;
     println!("loaded flash");
-    let mut emu = Emulator::new(1024 * 100);
+    let mut emu = Emulator::new(1024 * 100, 1);
     emu.flash(mem);
-    println!("flashed");
     emu.run_program()?;
     if let Some(path) = args.dump {
         let path = std::path::Path::new(&path);

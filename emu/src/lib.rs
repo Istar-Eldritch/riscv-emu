@@ -7,7 +7,7 @@ use memory::Memory;
 use rv32i::rv32i;
 
 #[derive(Debug)]
-pub enum Interrupts {
+pub enum Interrupt {
     SSoftInterrupt = 1,
     MSoftInterrupt = 3,
     STimerInterrupt = 5,
@@ -45,13 +45,29 @@ impl std::error::Error for CPUException {}
 pub struct Emulator {
     cpu: CPU,
     mem: Memory,
+    speed: u32, // speed in hz
+}
+
+pub fn interrupt(cpu: &mut CPU, exc: Interrupt, extra: u32) {
+    cpu.set_csr(CSRs::mip as u32, 0b10).unwrap();
+    let cause = exc as u32;
+    cpu.set_csr(CSRs::mstatus as u32, cause & 1 << 31).unwrap();
+    cpu.set_csr(CSRs::mtval as u32, extra).unwrap();
+}
+
+pub fn exception(cpu: &mut CPU, exc: CPUException, extra: u32) {
+    let cause = exc as u32;
+    cpu.set_csr(CSRs::mcause as u32, cause).unwrap();
+    cpu.set_csr(CSRs::mepc as u32, cpu.pc).unwrap();
+    cpu.set_csr(CSRs::mtval as u32, extra).unwrap();
 }
 
 impl Emulator {
-    pub fn new(mem_capacity: u32) -> Self {
+    pub fn new(mem_capacity: u32, speed: u32) -> Self {
         Emulator {
             cpu: CPU::new(),
             mem: Memory::new(mem_capacity),
+            speed,
         }
     }
 
@@ -63,9 +79,37 @@ impl Emulator {
 
     fn run_instruction(&mut self, word: u32) -> Result<(), CPUException> {
         match rv32i(&mut self.cpu, &mut self.mem, word) {
-            Err(exc) => {
-                let cause = exc as u32;
-                self.cpu.set_csr(CSRs::mcause as u32, cause).unwrap();
+            Some(v) => {
+                self.cpu.pc += 4;
+                if v > 0 {
+                    std::thread::sleep(std::time::Duration::from_nanos(
+                        (1e9 / self.speed as f64).round() as u64,
+                    ));
+                }
+            }
+            _ => {
+                exception(&mut self.cpu, CPUException::IllegalInstruction, word);
+            }
+        };
+
+        Ok(())
+    }
+
+    pub fn run_program(&mut self) -> Result<(), CPUException> {
+        loop {
+            let status = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
+            let mie = status & (1 << 3);
+            let cause = self.cpu.get_csr(CSRs::mcause as u32).unwrap();
+            let code = cause & !(1 << 31);
+            let exception = code != 0 && ((cause & (1 << 31)) >> 31) == 0;
+
+            if exception {
+                // set the mpie register
+                self.cpu
+                    .set_csr(CSRs::mstatus as u32, status & (mie << 4))
+                    .unwrap();
+            }
+            if exception || (!exception && mie == 0b100) {
                 let mtvec = self.cpu.get_csr(CSRs::mtvec as u32).unwrap();
                 let mode = mtvec & 0b11;
                 let base = (mtvec & !0b11) >> 2;
@@ -74,18 +118,9 @@ impl Emulator {
                 } else {
                     base + (4 * cause as u32)
                 };
-                self.cpu.set_csr(CSRs::mepc as u32, self.cpu.pc).unwrap();
-
+                self.cpu.set_csr(CSRs::mip as u32, 0).unwrap();
                 self.cpu.pc = pcv;
             }
-            _ => (),
-        };
-        self.cpu.pc += 4;
-        Ok(())
-    }
-
-    pub fn run_program(&mut self) -> Result<(), CPUException> {
-        loop {
             let pc = self.cpu.pc;
             let word = self.mem.rw(pc);
             if word == 0 {
