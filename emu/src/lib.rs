@@ -3,7 +3,7 @@ mod memory;
 mod rv32i;
 mod utils;
 
-use memory::Memory;
+use memory::{GenericMemory, Memory};
 use rv32i::rv32i;
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl std::error::Error for CPUException {}
 
 pub struct Emulator {
     cpu: CPU,
-    mem: Memory,
+    mem: Box<dyn Memory>,
     speed: u32, // speed in hz
 }
 
@@ -66,7 +66,7 @@ impl Emulator {
     pub fn new(mem_capacity: u32, speed: u32) -> Self {
         Emulator {
             cpu: CPU::new(),
-            mem: Memory::new(mem_capacity),
+            mem: Box::new(GenericMemory::new(mem_capacity)),
             speed,
         }
     }
@@ -78,7 +78,7 @@ impl Emulator {
     }
 
     fn run_instruction(&mut self, word: u32) -> Result<(), CPUException> {
-        match rv32i(&mut self.cpu, &mut self.mem, word) {
+        match rv32i(&mut self.cpu, &mut *self.mem, word) {
             Some(v) => {
                 self.cpu.pc += 4;
                 if v > 0 {

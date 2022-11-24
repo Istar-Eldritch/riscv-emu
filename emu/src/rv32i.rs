@@ -3,21 +3,21 @@ use crate::format::*;
 use crate::utils::*;
 
 /// Load Upper Immediate
-fn lui(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
+fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = UFormat::try_from(word).unwrap(); // TODO: Handle trap
     cpu.x[parsed.rd as usize] = sext(parsed.imm << 12, 20, 32);
     Some(1)
 }
 
 /// Add Upper Immediate to PC
-fn auipc(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
+fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = UFormat::try_from(word).unwrap();
     cpu.x[parsed.rd as usize] = cpu.pc + sext(parsed.imm << 12, 20, 32);
     Some(1)
 }
 
 /// Jump and Link
-fn jal(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
+fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = JFormat::try_from(word).unwrap();
     cpu.x[parsed.rd as usize] = cpu.pc + 4;
     cpu.pc += sext(
@@ -29,7 +29,7 @@ fn jal(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
 }
 
 /// Jump and Link Register
-fn jalr(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
+fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = IFormat::try_from(word).unwrap();
     cpu.pc = (cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32)) & !1;
     let addr = if parsed.rd == 0 { 1 } else { parsed.rd };
@@ -37,7 +37,7 @@ fn jalr(cpu: &mut CPU, _mem: &mut Memory, word: u32) -> Option<u32> {
     Some(1)
 }
 
-fn beq(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn beq(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if cpu.x[parsed.rs1 as usize] == cpu.x[parsed.rs2 as usize] {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -48,7 +48,7 @@ fn beq(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<
     Some(1)
 }
 
-fn bge(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn bge(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if cpu.x[parsed.rs1 as usize] as i32 >= cpu.x[parsed.rs2 as usize] as i32 {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -59,7 +59,7 @@ fn bge(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<
     Some(1)
 }
 
-fn bgeu(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn bgeu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if cpu.x[parsed.rs1 as usize] >= cpu.x[parsed.rs2 as usize] {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -70,7 +70,7 @@ fn bgeu(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option
     Some(1)
 }
 
-fn blt(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn blt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if (cpu.x[parsed.rs1 as usize] as i32) < cpu.x[parsed.rs2 as usize] as i32 {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -81,7 +81,7 @@ fn blt(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<
     Some(1)
 }
 
-fn bltu(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn bltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if cpu.x[parsed.rs1 as usize] < cpu.x[parsed.rs2 as usize] {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -92,7 +92,7 @@ fn bltu(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option
     Some(1)
 }
 
-fn bne(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<u32> {
+fn bne(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat, _word: u32) -> Option<u32> {
     if cpu.x[parsed.rs1 as usize] != cpu.x[parsed.rs2 as usize] {
         cpu.pc += sext(
             parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
@@ -104,7 +104,7 @@ fn bne(cpu: &mut CPU, _mem: &mut Memory, parsed: BFormat, _word: u32) -> Option<
 }
 
 /// Branch parsing
-fn branch(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn branch(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = BFormat::try_from(word).unwrap();
     let op = match parsed.funct3 {
         0b000 => beq,
@@ -121,43 +121,43 @@ fn branch(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-fn lb(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = sext(mem.rb(addr) as u32, 8, 32);
     Some(1)
 }
 
-fn lbu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lbu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = mem.rb(addr) as u32;
     Some(1)
 }
 
-fn lh(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = sext(mem.rhw(addr) as u32, 16, 32);
     Some(1)
 }
 
-fn lhu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lhu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = mem.rhw(addr) as u32;
     Some(1)
 }
 
-fn lw(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = sext(mem.rw(addr) as u32, 32, 32);
     Some(1)
 }
 
-fn lwu(cpu: &mut CPU, mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn lwu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
     cpu.x[parsed.rd as usize] = mem.rw(addr) as u32;
     Some(1)
 }
 
-fn load(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn load(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = IFormat::try_from(word).unwrap();
     let op = match parsed.funct3 {
         0b000 => lb,
@@ -174,25 +174,25 @@ fn load(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-fn sb(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat, _word: u32) -> Option<u32> {
+fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
     mem.wb(addr, cpu.x[parsed.rs2 as usize] as u8);
     Some(1)
 }
 
-fn sh(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat, _word: u32) -> Option<u32> {
+fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
     mem.whw(addr, cpu.x[parsed.rs2 as usize] as u16);
     Some(1)
 }
 
-fn sw(cpu: &mut CPU, mem: &mut Memory, parsed: SFormat, _word: u32) -> Option<u32> {
+fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat, _word: u32) -> Option<u32> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
     mem.ww(addr, cpu.x[parsed.rs2 as usize]);
     Some(1)
 }
 
-fn store(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn store(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = SFormat::try_from(word).unwrap();
     let op = match parsed.funct3 {
         0b000 => sb,
@@ -206,12 +206,12 @@ fn store(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-fn addi(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn addi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(sext(parsed.imm, 12, 32));
     Some(1)
 }
 
-fn slti(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn slti(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let v = if (cpu.x[parsed.rs1 as usize] as i32) < sext(parsed.imm, 12, 32) as i32 {
         1
     } else {
@@ -222,7 +222,7 @@ fn slti(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Optio
     Some(1)
 }
 
-fn sltiu(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn sltiu(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let v = if cpu.x[parsed.rs1 as usize] < sext(parsed.imm, 12, 32) {
         1
     } else {
@@ -233,39 +233,39 @@ fn sltiu(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Opti
     Some(1)
 }
 
-fn xori(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn xori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] ^ sext(cpu.x[parsed.imm as usize], 12, 32);
     Some(1)
 }
 
-fn ori(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn ori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] | sext(cpu.x[parsed.imm as usize], 12, 32);
     Some(1)
 }
 
-fn andi(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn andi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize] & sext(cpu.x[parsed.imm as usize], 12, 32);
     Some(1)
 }
 
-fn slli(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn slli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shl(shamt);
     Some(1)
 }
 
-fn srli(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn srli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shr(shamt);
     Some(1)
 }
 
-fn srai(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Option<u32> {
+fn srai(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat, _word: u32) -> Option<u32> {
     let shamt = parsed.imm & 0b11111;
     let rs1 = cpu.x[parsed.rs1 as usize];
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
@@ -273,7 +273,7 @@ fn srai(cpu: &mut CPU, __mem: &mut Memory, parsed: IFormat, _word: u32) -> Optio
     Some(1)
 }
 
-fn immediate(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn immediate(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = IFormat::try_from(word).unwrap();
     let op = match parsed.funct3 {
         0b000 => addi,
@@ -293,23 +293,23 @@ fn immediate(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-fn add(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn add(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(cpu.x[parsed.rs2 as usize]);
     Some(1)
 }
 
-fn sub(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn sub(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_sub(cpu.x[parsed.rs2 as usize]);
     Some(1)
 }
 
-fn sll(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn sll(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize].wrapping_shl(cpu.x[parsed.rs2 as usize] & 0b11111);
     Some(1)
 }
 
-fn slt(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn slt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     let v = if (cpu.x[parsed.rs1 as usize] as i32) < cpu.x[parsed.rs2 as usize] as i32 {
         1
     } else {
@@ -320,7 +320,7 @@ fn slt(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<
     Some(1)
 }
 
-fn sltu(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn sltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     let v = if cpu.x[parsed.rs1 as usize] < cpu.x[parsed.rs2 as usize] {
         1
     } else {
@@ -331,35 +331,35 @@ fn sltu(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option
     Some(1)
 }
 
-fn xor(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn xor(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] ^ cpu.x[parsed.rs2 as usize];
     Some(1)
 }
 
-fn srl(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn srl(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] =
         cpu.x[parsed.rs1 as usize].wrapping_shr(cpu.x[parsed.rs2 as usize] & 0b11111);
     Some(1)
 }
 
-fn sra(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn sra(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     let shamt = cpu.x[parsed.rs2 as usize] & 0b11111;
     let rs1 = cpu.x[parsed.rs1 as usize];
     cpu.x[parsed.rd as usize] = (rs1 as i32).wrapping_shr(shamt) as u32;
     Some(1)
 }
 
-fn or(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn or(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] | cpu.x[parsed.rs2 as usize];
     Some(1)
 }
 
-fn and(cpu: &mut CPU, _mem: &mut Memory, parsed: RFormat, _word: u32) -> Option<u32> {
+fn and(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat, _word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] & cpu.x[parsed.rs2 as usize];
     Some(1)
 }
 
-fn arithmetic(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn arithmetic(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = RFormat::from(word);
     let op = match parsed.funct3 {
         0b000 if parsed.funct7 == 0 => add,
@@ -380,12 +380,12 @@ fn arithmetic(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-fn fence(_cpu: &mut CPU, _mem: &mut Memory, _word: u32) -> Option<u32> {
+fn fence(_cpu: &mut CPU, _mem: &mut dyn Memory, _word: u32) -> Option<u32> {
     // No need to do anything given we do not reorder memroy writes / loads
     Some(0)
 }
 
-fn csrrw(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrw(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     let t = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -404,7 +404,7 @@ fn csrrw(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option
     Some(1)
 }
 
-fn csrrs(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrs(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     let t = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -423,7 +423,7 @@ fn csrrs(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option
     Some(1)
 }
 
-fn csrrc(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     let t = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -442,7 +442,7 @@ fn csrrc(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option
     Some(1)
 }
 
-fn csrrwi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrwi(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     cpu.x[parsed.rd as usize] = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -460,7 +460,7 @@ fn csrrwi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Optio
     Some(1)
 }
 
-fn csrrsi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrsi(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     let t = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -479,7 +479,7 @@ fn csrrsi(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Optio
     Some(1)
 }
 
-fn csrrci(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Option<u32> {
+fn csrrci(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat, word: u32) -> Option<u32> {
     let t = match cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
@@ -498,7 +498,7 @@ fn csrrci(cpu: &mut CPU, _mem: &mut Memory, parsed: IFormat, word: u32) -> Optio
     Some(1)
 }
 
-fn system(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+fn system(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let parsed = IFormat::from(word);
 
     let op = match parsed.funct3 {
@@ -524,7 +524,7 @@ fn system(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
     op(cpu, mem, parsed, word)
 }
 
-pub fn rv32i(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
+pub fn rv32i(cpu: &mut CPU, mem: &mut dyn Memory, word: u32) -> Option<u32> {
     let opcode = opcode(word);
     let op = match opcode {
         0b0110111 => lui,
@@ -549,11 +549,11 @@ pub fn rv32i(cpu: &mut CPU, mem: &mut Memory, word: u32) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::memory::GenericMemory;
     #[test]
     fn lui_writes_register() {
         let mut cpu = CPU::new();
-        let mut mem = Memory::new(1024 * 100);
+        let mut mem = GenericMemory::new(1024 * 100);
         // lui x1, 0x23
         let word = 0x0002_20b7;
         lui(&mut cpu, &mut mem, word);
