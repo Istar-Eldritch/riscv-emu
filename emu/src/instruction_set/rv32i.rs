@@ -1,6 +1,6 @@
-use super::{exception, CPUException, Memory, CPU};
-use crate::format::*;
+use super::format::*;
 use crate::utils::*;
+use crate::{exception, CPUException, Memory, CPU};
 
 /// Load Upper Immediate
 fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, word: u32) -> Option<u32> {

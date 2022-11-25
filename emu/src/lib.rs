@@ -1,10 +1,9 @@
-mod format;
+mod instruction_set;
 mod memory;
-mod rv32i;
 mod utils;
 
+use instruction_set::rv32i::rv32i;
 use memory::{Memory, MMU};
-use rv32i::rv32i;
 
 #[derive(Debug)]
 pub enum Interrupt {
