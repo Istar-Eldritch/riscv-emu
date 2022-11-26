@@ -133,24 +133,21 @@ impl TryFrom<u32> for RV32i {
     }
 }
 
-fn ecall(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.exception(
-        ExceptionInterrupt::Exception(Exception::UEnvironmentCall),
-        parsed.into(),
-    );
-    Ok(1)
+fn ecall(
+    _cpu: &mut CPU,
+    _mem: &mut dyn Memory,
+    _parsed: IFormat,
+) -> Result<u32, ExceptionInterrupt> {
+    // TODO: Environemnt calls on other privilege modes
+    Err(ExceptionInterrupt::Exception(Exception::MEnvironmentCall))
 }
 
 fn ebreak(
-    cpu: &mut CPU,
+    _cpu: &mut CPU,
     _mem: &mut dyn Memory,
-    parsed: IFormat,
+    _parsed: IFormat,
 ) -> Result<u32, ExceptionInterrupt> {
-    cpu.exception(
-        ExceptionInterrupt::Exception(Exception::Breakpoint),
-        parsed.into(),
-    );
-    Ok(1)
+    Err(ExceptionInterrupt::Exception(Exception::Breakpoint))
 }
 
 /// Load Upper Immediate
