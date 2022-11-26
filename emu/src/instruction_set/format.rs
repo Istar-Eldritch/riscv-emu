@@ -11,8 +11,9 @@ pub fn opcode(v: u32) -> u32 {
     v & OPCODE_MASK
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RFormat {
+    pub op: u32,
     pub rd: u32,
     pub funct3: u32,
     pub rs1: u32,
@@ -23,6 +24,7 @@ pub struct RFormat {
 impl From<u32> for RFormat {
     fn from(v: u32) -> RFormat {
         RFormat {
+            op: v & OPCODE_MASK,
             rd: (v & RD_MASK) >> 7,
             funct3: (v & FUNCT3_MASK) >> 12,
             rs1: (v & RS1_MASK) >> 15,
@@ -32,7 +34,15 @@ impl From<u32> for RFormat {
     }
 }
 
+impl From<RFormat> for u32 {
+    fn from(v: RFormat) -> u32 {
+        v.op | v.rd << 7 | v.funct3 << 12 | v.rs1 << 15 | v.rs2 << 20 | v.funct7 << 25
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct IFormat {
+    pub op: u32,
     pub rd: u32,
     pub funct3: u32,
     pub rs1: u32,
@@ -43,6 +53,7 @@ impl From<u32> for IFormat {
     fn from(v: u32) -> IFormat {
         const IIMM_MASK: u32 = mask!(12) << 20;
         IFormat {
+            op: v & OPCODE_MASK,
             rd: (v & RD_MASK) >> 7,
             funct3: (v & FUNCT3_MASK) >> 12,
             rs1: (v & RS1_MASK) >> 15,
@@ -51,7 +62,15 @@ impl From<u32> for IFormat {
     }
 }
 
+impl From<IFormat> for u32 {
+    fn from(v: IFormat) -> u32 {
+        v.op | v.rd << 7 | v.funct3 << 12 | v.rs1 << 15 | v.imm << 20
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct SFormat {
+    pub op: u32,
     pub imm0: u32,
     pub funct3: u32,
     pub rs1: u32,
@@ -62,6 +81,7 @@ pub struct SFormat {
 impl From<u32> for SFormat {
     fn from(v: u32) -> SFormat {
         SFormat {
+            op: v & OPCODE_MASK,
             imm0: (v & RD_MASK) >> 7,
             funct3: (v & FUNCT3_MASK) >> 12,
             rs1: (v & RS1_MASK) >> 15,
@@ -71,7 +91,15 @@ impl From<u32> for SFormat {
     }
 }
 
+impl From<SFormat> for u32 {
+    fn from(v: SFormat) -> u32 {
+        v.op | v.imm0 << 7 | v.funct3 << 12 | v.rs1 << 15 | v.rs2 << 20 | v.imm1 << 25
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct BFormat {
+    pub op: u32,
     pub imm0: u32,
     pub imm1: u32,
     pub funct3: u32,
@@ -84,6 +112,7 @@ pub struct BFormat {
 impl From<u32> for BFormat {
     fn from(v: u32) -> BFormat {
         BFormat {
+            op: v & OPCODE_MASK,
             imm0: (v & (1 << 7)) >> 7,
             imm1: (v & (mask!(4) << 8)) >> 8,
             funct3: (v & FUNCT3_MASK) >> 12,
@@ -95,6 +124,19 @@ impl From<u32> for BFormat {
     }
 }
 
+impl From<BFormat> for u32 {
+    fn from(v: BFormat) -> u32 {
+        v.op | v.imm0 << 7
+            | v.imm1 << 8
+            | v.funct3 << 12
+            | v.rs1 << 15
+            | v.rs2 << 20
+            | v.imm2 << 25
+            | v.imm3 << 31
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct UFormat {
     pub rd: u32,
     pub imm: u32,
@@ -108,7 +150,7 @@ impl From<u32> for UFormat {
         }
     }
 }
-
+#[derive(Clone, Copy)]
 pub struct JFormat {
     pub rd: u32,
     pub imm0: u32,

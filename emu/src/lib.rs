@@ -2,10 +2,10 @@ mod instruction_set;
 mod memory;
 mod utils;
 
-use instruction_set::{privileged::privileged, rv32i::rv32i};
+use instruction_set::{privileged::RVPrivileged, rv32i::RV32i, Instruction};
 use memory::{Memory, MMU};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Interrupt {
     SSoftInterrupt = 1,
     MSoftInterrupt = 3,
@@ -15,8 +15,8 @@ pub enum Interrupt {
     MExternalInterrupt = 11,
 }
 
-#[derive(Debug)]
-pub enum CPUException {
+#[derive(Debug, Clone, Copy)]
+pub enum Exception {
     InstructionAddressMissaligned = 0,
     InstructionAccessFault = 1,
     IllegalInstruction = 2,
@@ -33,32 +33,24 @@ pub enum CPUException {
     StorePageFault = 14,
 }
 
-impl std::fmt::Display for CPUException {
+#[derive(Debug)]
+pub enum ExceptionInterrupt {
+    Interrupt(Interrupt),
+    Exception(Exception),
+}
+
+impl std::fmt::Display for ExceptionInterrupt {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         fmt.write_fmt(format_args!("{:?}", self))
     }
 }
 
-impl std::error::Error for CPUException {}
+impl std::error::Error for ExceptionInterrupt {}
 
 pub struct Emulator {
     cpu: CPU,
     mem: Box<dyn Memory>,
     speed: u32, // speed in hz
-}
-
-pub fn interrupt(cpu: &mut CPU, exc: Interrupt, extra: u32) {
-    cpu.set_csr(CSRs::mip as u32, 0b10).unwrap();
-    let cause = exc as u32;
-    cpu.set_csr(CSRs::mstatus as u32, cause & 1 << 31).unwrap();
-    cpu.set_csr(CSRs::mtval as u32, extra).unwrap();
-}
-
-pub fn exception(cpu: &mut CPU, exc: CPUException, extra: u32) {
-    let cause = exc as u32;
-    cpu.set_csr(CSRs::mcause as u32, cause).unwrap();
-    cpu.set_csr(CSRs::mepc as u32, cpu.pc).unwrap();
-    cpu.set_csr(CSRs::mtval as u32, extra).unwrap();
 }
 
 fn wait_cycles(hz: u32, cycles: u32) {
@@ -69,11 +61,12 @@ fn wait_cycles(hz: u32, cycles: u32) {
 
 pub enum TickResult {
     WFI,
+    HALT,
     Cycles(u32),
 }
 
 impl Emulator {
-    pub fn new(_mem_capacity: u32, speed: u32) -> Self {
+    pub fn new(speed: u32) -> Self {
         Emulator {
             cpu: CPU::new(),
             mem: Box::new(MMU::new()),
@@ -87,63 +80,79 @@ impl Emulator {
         }
     }
 
-    fn run_instruction(&mut self, word: u32) -> Result<u32, CPUException> {
+    fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         println!("run");
-        let v = if let Some(v) = privileged(&mut self.cpu, &mut *self.mem, word) {
-            v
-        } else if let Some(v) = rv32i(&mut self.cpu, &mut *self.mem, word) {
-            v
+        let v = if let Ok(v) = RVPrivileged::try_from(word) {
+            v.execute(&mut self.cpu, &mut *self.mem)?
+        } else if let Ok(v) = RV32i::try_from(word) {
+            v.execute(&mut self.cpu, &mut *self.mem)?
         } else {
-            exception(&mut self.cpu, CPUException::IllegalInstruction, word);
-            return Ok(0);
+            return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
         };
 
         self.cpu.pc += 4;
         Ok(v)
     }
 
-    pub fn tick(&mut self) -> Result<TickResult, CPUException> {
-        let status = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
-        let mie = status & (1 << 3);
-        let cause = self.cpu.get_csr(CSRs::mcause as u32).unwrap();
-        let code = cause & !(1 << 31);
-        let exception = code != 0 && ((cause & (1 << 31)) >> 31) == 0;
-
-        if exception {
-            // set the mpie register
-            self.cpu
-                .set_csr(CSRs::mstatus as u32, status & (mie << 4))
-                .unwrap();
-        }
-        if exception || (!exception && mie == 0b100) {
-            let mtvec = self.cpu.get_csr(CSRs::mtvec as u32).unwrap();
-            let mode = mtvec & 0b11;
-            let base = (mtvec & !0b11) >> 2;
-
-            // TODO: If there is no trap, halt execution
-            let pcv = if mode == 0 {
-                base
-            } else {
-                base + (4 * cause as u32)
-            };
-            self.cpu.set_csr(CSRs::mip as u32, 0).unwrap();
-            self.cpu.pc = pcv;
-        }
+    pub fn tick(&mut self) -> TickResult {
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
+
         if self.cpu.wfi {
-            Ok(TickResult::WFI)
+            TickResult::WFI
         } else if word == 0 {
-            // TODO: Should instead add an exception
-            Err(CPUException::IllegalInstruction)
+            self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else {
-            self.run_instruction(word).map(|v| TickResult::Cycles(v))
+            match self.run_instruction(word) {
+                Ok(v) => TickResult::Cycles(v),
+                Err(err) => self.handle_exception(err),
+            }
         }
     }
 
-    pub fn run_program(&mut self) -> Result<(), CPUException> {
+    // Handles interrupts and exceptions
+    fn handle_exception(&mut self, exc: ExceptionInterrupt) -> TickResult {
+        let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
+
+        let mstatus_mie = mstatus & (1 << 2);
+        let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
+
+        let code = match exc {
+            ExceptionInterrupt::Interrupt(i) => {
+                if mstatus_mie != 0 && (mie & (1 << i as u32) != 0) {
+                    self.cpu
+                        .set_csr(CSRs::mcause as u32, i as u32 | (1 << 31))
+                        .unwrap();
+                } else {
+                    return TickResult::Cycles(4);
+                }
+                i as u32
+            }
+            ExceptionInterrupt::Exception(e) => {
+                self.cpu.set_csr(CSRs::mcause as u32, e as u32).unwrap();
+                e as u32
+            }
+        };
+
+        let mstatus = (mstatus & !(1 << 2)) | mstatus_mie << 4; // move mie to mpie and set mie to 0 (disable interrupts)
+        self.cpu.set_csr(CSRs::mstatus as u32, mstatus).unwrap();
+        self.cpu.set_csr(CSRs::mepc as u32, self.cpu.pc).unwrap();
+        self.cpu.set_csr(CSRs::mtval as u32, self.cpu.pc).unwrap(); // TODO: How do we bubble up suporting data?
+                                                                    // TODO: Set privilege mode on msatus.MPP
+        let mtvec = self.cpu.get_csr(CSRs::mtvec as u32).unwrap();
+        let mode = mtvec & 0b11;
+        let base = (mtvec & !0b11) >> 2;
+
+        // TODO: If there is no trap, halt execution
+        let pcv = if mode == 0 { base } else { base + (4 * code) };
+        self.cpu.pc = pcv;
+
+        TickResult::Cycles(4)
+    }
+
+    pub fn run_program(&mut self) -> Result<(), ExceptionInterrupt> {
         loop {
-            let res = self.tick()?;
+            let res = self.tick();
             let cycles = if let TickResult::Cycles(v) = res {
                 v
             } else {
@@ -207,7 +216,17 @@ impl CPU {
         }
     }
 
-    fn csr_idx_map(v: u32) -> Result<usize, CPUException> {
+    fn exception(&mut self, exc: ExceptionInterrupt, extra: u32) {
+        let cause = match exc {
+            ExceptionInterrupt::Exception(c) => c as u32,
+            ExceptionInterrupt::Interrupt(c) => c as u32, // TODO: Init MIP
+        };
+        self.set_csr(CSRs::mcause as u32, cause).unwrap();
+        self.set_csr(CSRs::mepc as u32, self.pc).unwrap();
+        self.set_csr(CSRs::mtval as u32, extra).unwrap();
+    }
+
+    fn csr_idx_map(v: u32) -> Result<usize, Exception> {
         let m = match v {
             _ if CSRs::mstatus as u32 == v => 0,
             _ if CSRs::mip as u32 == v => 1,
@@ -217,17 +236,17 @@ impl CPU {
             _ if CSRs::mtval as u32 == v => 5,
             _ if CSRs::mepc as u32 == v => 6,
             _ if CSRs::mscratch as u32 == v => 7,
-            _ => return Err(CPUException::IllegalInstruction),
+            _ => return Err(Exception::IllegalInstruction),
         };
         Ok(m)
     }
 
-    pub fn get_csr(&self, addr: u32) -> Result<u32, CPUException> {
+    pub fn get_csr(&self, addr: u32) -> Result<u32, Exception> {
         let idx = Self::csr_idx_map(addr)?;
         Ok(self.csr[idx])
     }
 
-    pub fn set_csr(&mut self, addr: u32, v: u32) -> Result<(), CPUException> {
+    pub fn set_csr(&mut self, addr: u32, v: u32) -> Result<(), Exception> {
         let idx = Self::csr_idx_map(addr)?;
         self.csr[idx] = v;
         Ok(())
