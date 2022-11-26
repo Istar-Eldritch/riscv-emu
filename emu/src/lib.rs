@@ -94,10 +94,25 @@ impl Emulator {
         Ok(v)
     }
 
+    fn get_interrupt(&self) -> Option<Interrupt> {
+        use Interrupt::*;
+        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        match mip {
+            // TODO: Handle interrupts for other privilege modes
+            v if (v & (1 << MSoftInterrupt as u32)) != 0 => Some(MSoftInterrupt),
+            v if (v & (1 << MTimerInterrupt as u32)) != 0 => Some(MTimerInterrupt),
+            v if (v & (1 << MExternalInterrupt as u32)) != 0 => Some(MExternalInterrupt),
+            _ => None,
+        }
+    }
+
     pub fn tick(&mut self) -> TickResult {
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
 
+        if let Some(exc) = self.get_interrupt() {
+            self.handle_exception(ExceptionInterrupt::Interrupt(exc));
+        }
         if self.cpu.wfi {
             TickResult::WFI
         } else if word == 0 {
