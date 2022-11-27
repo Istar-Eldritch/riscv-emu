@@ -101,6 +101,7 @@ impl Emulator {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MSoftInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
+            self.mem.ww(0x200_0000, 0);
         }
 
         let cmp_time: u64 = self.mem.rw(0x200_4000) as u64;
@@ -109,12 +110,18 @@ impl Emulator {
 
         let time: u64 = self.mem.rw(0x200_bff8) as u64;
         let time: u64 = time | ((self.mem.rw(0x200_bff8 + 4) as u64) << 4);
+        let time = time + 1;
 
         if time > cmp_time {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MTimerInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
         }
+
+        let time32: u32 = time as u32;
+        self.mem.ww(0x200_bff8, time32);
+        let time32: u32 = (time >> 32) as u32;
+        self.mem.ww(0x200_bff8, time32);
     }
 
     fn get_interrupt(&self) -> Option<Interrupt> {
