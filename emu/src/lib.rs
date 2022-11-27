@@ -94,6 +94,29 @@ impl Emulator {
         Ok(v)
     }
 
+    fn generate_clint_interrupts(&mut self) {
+        use Interrupt::*;
+        let software_interrupt = self.mem.rw(0x200_0000);
+        if software_interrupt > 0 {
+            let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+            let mip = mip | (1 << MSoftInterrupt as u32);
+            self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
+        }
+
+        let cmp_time: u64 = self.mem.rw(0x200_4000) as u64;
+
+        let cmp_time: u64 = cmp_time | ((self.mem.rw(0x200_4004) as u64) << 4);
+
+        let time: u64 = self.mem.rw(0x200_bff8) as u64;
+        let time: u64 = time | ((self.mem.rw(0x200_bff8 + 4) as u64) << 4);
+
+        if time > cmp_time {
+            let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+            let mip = mip | (1 << MTimerInterrupt as u32);
+            self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
+        }
+    }
+
     fn get_interrupt(&self) -> Option<Interrupt> {
         use Interrupt::*;
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
@@ -109,6 +132,8 @@ impl Emulator {
     pub fn tick(&mut self) -> TickResult {
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
+
+        self.generate_clint_interrupts();
 
         if let Some(exc) = self.get_interrupt() {
             self.handle_exception(ExceptionInterrupt::Interrupt(exc));
