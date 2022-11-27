@@ -19,17 +19,20 @@ pub trait Memory {
 
 pub struct MMU {
     flash: GenericMemory,
+    clint: CLINT,
 }
 
 impl MMU {
     pub fn new() -> Self {
         Self {
             flash: GenericMemory::new(0x32000),
+            clint: CLINT::new(),
         }
     }
     fn get_mem_mut(&mut self, addr: u32) -> Box<&mut dyn Memory> {
         match addr {
             v if v <= 0x32000 => Box::new(&mut self.flash), //
+            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Box::new(&mut self.clint),
             _ => {
                 todo!();
             }
@@ -39,6 +42,7 @@ impl MMU {
     fn get_mem(&self, addr: u32) -> Box<&dyn Memory> {
         match addr {
             v if v < 0x32000 => Box::new(&self.flash), //
+            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Box::new(&self.clint),
             _ => todo!(),
         }
     }
@@ -46,6 +50,7 @@ impl MMU {
     fn translate_address(addr: u32) -> u32 {
         match addr {
             v if v < 0x32000 => addr, //
+            v if v >= 0x0200_0000 && v < 0x0200_FFFF => addr - 0x0200_0000,
             _ => todo!(),
         }
     }
@@ -81,6 +86,91 @@ impl Memory for MMU {
     fn ww(&mut self, addr: u32, value: u32) {
         self.get_mem_mut(addr)
             .ww(MMU::translate_address(addr), value)
+    }
+}
+
+pub struct CLINT {
+    pub msip0: u32,    // addr 0
+    pub mtimecmp: u64, // addr 4
+    pub mtime: u64,    // addr 12
+}
+
+impl CLINT {
+    pub fn new() -> Self {
+        Self {
+            msip0: 0,
+            mtimecmp: 0,
+            mtime: 0,
+        }
+    }
+
+    fn translate_address(addr: u32) -> Result<usize, ()> {
+        match addr {
+            v if v < 4 => Ok(0 + v as usize),
+            v if v >= 0x4000 && v < 0x4008 => Ok(4 + (v - 0x4000) as usize),
+            v if v >= 0xbff8 && v < (0xbff8 + 8) => Ok(12 + (v - 0xbff8) as usize),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Memory for CLINT {
+    fn size(&self) -> u32 {
+        0xbff8 + 8
+    }
+
+    fn rb(&self, addr: u32) -> u8 {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *const u8 = std::mem::transmute((ptr as usize) + shift);
+            read_volatile(to_read)
+        }
+    }
+
+    fn wb(&mut self, addr: u32, value: u8) {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *mut u8 = std::mem::transmute((ptr as usize) + shift);
+            write_volatile(to_read, value)
+        }
+    }
+
+    fn rhw(&self, addr: u32) -> u16 {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *const u16 = std::mem::transmute((ptr as usize) + shift);
+            read_volatile(to_read)
+        }
+    }
+
+    fn whw(&mut self, addr: u32, value: u16) {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *mut u16 = std::mem::transmute((ptr as usize) + shift);
+            write_volatile(to_read, value)
+        }
+    }
+
+    fn rw(&self, addr: u32) -> u32 {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *const u32 = std::mem::transmute((ptr as usize) + shift);
+            read_volatile(to_read)
+        }
+    }
+
+    fn ww(&mut self, addr: u32, value: u32) {
+        let shift = Self::translate_address(addr).unwrap();
+        let ptr: *const Self = self;
+        unsafe {
+            let to_read: *mut u32 = std::mem::transmute((ptr as usize) + shift);
+            write_volatile(to_read, value)
+        }
     }
 }
 
