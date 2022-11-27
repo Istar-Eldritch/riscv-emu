@@ -5,15 +5,37 @@ use crate::{Exception, ExceptionInterrupt, Memory, CPU};
 
 #[derive(Clone, Copy)]
 pub enum RV32i {
+    /// Load upper immediate
+    /// Writes the sign-extended 20-bit immediate, left shifted by 12bits to x[rd] zeroin the lower
+    /// 12 bit.
     LUI(UFormat),
+    /// Add upper immediate to PC
+    /// Adds the sign-extended 20bit immediate, left-shifted 12bit, to the pc, and writes the
+    /// result to x[rd]
     AUIPC(UFormat),
+    /// Jump and Link
+    /// Writes the address of the next instruction (pc + 4) to x[rd]. then set hte pc to the
+    /// current pc plus the sign-extended offset. If rd is omitted, x1 is used.
     JAL(JFormat),
+    /// Jump and Link Register
+    /// Sets the pc to x[rs1] + sign-extend(offset), masking off the least significant bit of the
+    /// computed address, then writes the previous pc+4 to x[rd]. If rd is omitted, x1 is asumed;
     JALR(IFormat),
+    /// Branch if Equal
+    /// If register x[rs1] equals register x[rs2], set the pc to the current pc plus sign-extended
+    /// offset.
     BEQ(BFormat),
+    /// Branch if Not Equal
+    /// If register x[rs1] does not equal register x[rs2], set the pc to the current pc plus the
+    /// sign extended offset.
     BNE(BFormat),
+    /// Branch if Less Than
     BLT(BFormat),
+    /// Branch if Greater Than or Equal
     BGE(BFormat),
+    /// Branch if Less Than unsigned
     BLTU(BFormat),
+    /// Branch if Greater or Equal Unsigned
     BGEU(BFormat),
     LB(IFormat),
     LH(IFormat),
@@ -175,9 +197,9 @@ fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, Exc
 
 /// Jump and Link Register
 fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.pc = (cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32)) & !1;
     let addr = if parsed.rd == 0 { 1 } else { parsed.rd };
     cpu.x[addr as usize] = cpu.pc + 4;
+    cpu.pc = (cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32)) & !1;
     Ok(1)
 }
 
@@ -643,23 +665,272 @@ fn system(word: u32) -> Result<RV32i, ()> {
 
 #[cfg(test)]
 mod tests {
+    use super::RV32i::*;
     use super::*;
     use crate::memory::GenericMemory;
+
     #[test]
-    fn lui_writes_register() -> Result<(), ()> {
+    fn test_lui() {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         // lui x1, 0x23
-        let word = 0x0002_20b7;
-        let i = RV32i::try_from(word)?;
-        match i {
-            RV32i::LUI(f) => {
-                lui(&mut cpu, &mut mem, f);
-                ()
-            }
-            _ => assert!(false),
-        };
-        assert_eq!(cpu.x[1], 0x22 << 12);
-        Ok(())
+        let lui = LUI(UFormat { rd: 1, imm: 23 });
+        lui.execute(&mut cpu, &mut mem).unwrap();
+        assert_eq!(cpu.x[1], 23 << 12);
+    }
+
+    #[test]
+    fn test_auipc() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        let inst = AUIPC(UFormat { rd: 1, imm: 23 });
+        inst.execute(&mut cpu, &mut mem).unwrap();
+        assert_eq!(cpu.x[1], (23 << 12) + 10);
+    }
+
+    #[test]
+    fn test_jal() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        let inst = JAL(JFormat {
+            rd: 1,
+            imm0: 0,
+            imm1: 0,
+            imm2: 23,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+        assert_eq!(cpu.x[1], 10 + 4);
+        assert_eq!(cpu.pc, 10 + 23);
+    }
+
+    #[test]
+    fn test_jalr() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[2] = 3;
+        let inst = JALR(IFormat {
+            op: 0b1100111,
+            rd: 1,
+            funct3: 0,
+            rs1: 2,
+            imm: 23,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.x[1], 10 + 4);
+        assert_eq!(cpu.pc, 3 + 23);
+    }
+
+    #[test]
+    fn test_beq0() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 1;
+        let inst = BEQ(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10 + 15);
+    }
+
+    #[test]
+    fn test_beq1() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 2;
+        let inst = BEQ(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10);
+    }
+
+    #[test]
+    fn test_bne0() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 1;
+        let inst = BNE(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10);
+    }
+
+    #[test]
+    fn test_bne1() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 2;
+        let inst = BNE(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10 + 15);
+    }
+
+    #[test]
+    fn test_blt0() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 1;
+        let inst = BLT(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10);
+    }
+
+    #[test]
+    fn test_blt1() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 2;
+        let inst = BLT(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10 + 15);
+    }
+
+    #[test]
+    fn test_bge0() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 0;
+        cpu.x[2] = 1;
+        let inst = BGE(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10);
+    }
+
+    #[test]
+    fn test_bge1() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 1;
+        cpu.x[2] = 1;
+        let inst = BGE(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10 + 15);
+    }
+
+    #[test]
+    fn test_bge2() {
+        let mut cpu = CPU::new();
+        let mut mem = GenericMemory::new(1024 * 100);
+        cpu.pc = 10;
+        cpu.x[1] = 2;
+        cpu.x[2] = 1;
+        let inst = BGE(BFormat {
+            op: 0b1100011,
+            funct3: 0,
+            rs1: 1,
+            rs2: 2,
+            imm0: 0,
+            imm1: 15,
+            imm2: 0,
+            imm3: 0,
+        });
+
+        inst.execute(&mut cpu, &mut mem).unwrap();
+
+        assert_eq!(cpu.pc, 10 + 15);
     }
 }
