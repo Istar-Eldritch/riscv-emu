@@ -3,6 +3,9 @@ use super::Instruction;
 use crate::utils::*;
 use crate::{Exception, ExceptionInterrupt, Memory, CPU};
 
+use Exception::*;
+use ExceptionInterrupt::*;
+
 #[derive(Debug, Clone, Copy)]
 pub enum RV32i {
     /// Load upper immediate
@@ -286,37 +289,46 @@ fn branch(word: u32) -> Result<RV32i, ()> {
 
 fn lb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rb(addr) as u32, 8, 32);
+    let byte = mem.rb(addr).map_err(|_| Exception(LoadAccessFault))?;
+    cpu.x[parsed.rd as usize] = sext(byte as u32, 8, 32);
     Ok(1)
 }
 
 fn lbu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rb(addr) as u32;
+    cpu.x[parsed.rd as usize] = mem.rb(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
     Ok(1)
 }
 
 fn lh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rhw(addr) as u32, 16, 32);
+    cpu.x[parsed.rd as usize] = sext(
+        mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+        16,
+        32,
+    );
     Ok(1)
 }
 
 fn lhu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rhw(addr) as u32;
+    cpu.x[parsed.rd as usize] = mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
     Ok(1)
 }
 
 fn lw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(mem.rw(addr) as u32, 32, 32);
+    cpu.x[parsed.rd as usize] = sext(
+        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+        32,
+        32,
+    );
     Ok(1)
 }
 
 fn lwu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rw(addr) as u32;
+    cpu.x[parsed.rd as usize] = mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
     Ok(1)
 }
 
@@ -336,20 +348,23 @@ fn load(word: u32) -> Result<RV32i, ()> {
 
 fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.wb(addr, cpu.x[parsed.rs2 as usize] as u8);
+    mem.wb(addr, cpu.x[parsed.rs2 as usize] as u8)
+        .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.whw(addr, cpu.x[parsed.rs2 as usize] as u16);
+    mem.whw(addr, cpu.x[parsed.rs2 as usize] as u16)
+        .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
     let value = cpu.x[parsed.rs2 as usize];
-    mem.ww(addr, value);
+    mem.ww(addr, value)
+        .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 

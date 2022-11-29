@@ -76,7 +76,7 @@ impl Emulator {
 
     pub fn flash(&mut self, mem: Vec<u8>) {
         for i in 0..mem.len() {
-            self.mem.wb(i as u32, mem[i]);
+            self.mem.wb(i as u32, mem[i]).unwrap();
         }
     }
 
@@ -100,22 +100,22 @@ impl Emulator {
         use Interrupt::*;
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
         let msi = (mie & (1 << MSoftInterrupt as u32)) != 0;
-        let software_interrupt = self.mem.rw(0x200_0000);
+        let software_interrupt = self.mem.rw(0x200_0000).unwrap();
         if msi && software_interrupt > 0 {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MSoftInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
-            self.mem.ww(0x200_0000, 0);
+            self.mem.ww(0x200_0000, 0).unwrap();
         }
 
         let mti = (mie & (1 << MTimerInterrupt as u32)) != 0;
 
-        let cmp_time: u64 = self.mem.rw(0x200_4000) as u64;
+        let cmp_time: u64 = self.mem.rw(0x200_4000).unwrap() as u64;
 
-        let cmp_time: u64 = cmp_time | ((self.mem.rw(0x200_4004) as u64) << 4);
+        let cmp_time: u64 = cmp_time | ((self.mem.rw(0x200_4004).unwrap() as u64) << 4);
 
-        let time: u64 = self.mem.rw(0x200_bff8) as u64;
-        let time: u64 = time | ((self.mem.rw(0x200_bffc) as u64) << 4);
+        let time: u64 = self.mem.rw(0x200_bff8).unwrap() as u64;
+        let time: u64 = time | ((self.mem.rw(0x200_bffc).unwrap() as u64) << 4);
         let time = time + 1;
 
         if mti && time >= cmp_time {
@@ -125,9 +125,9 @@ impl Emulator {
         }
 
         let time32: u32 = time as u32;
-        self.mem.ww(0x200_bff8, time32);
+        self.mem.ww(0x200_bff8, time32).unwrap();
         let time32: u32 = (time >> 32) as u32;
-        self.mem.ww(0x200_bffc, time32);
+        self.mem.ww(0x200_bffc, time32).unwrap();
     }
 
     fn get_interrupt(&mut self) -> Option<Interrupt> {
@@ -165,14 +165,18 @@ impl Emulator {
             self.handle_exception(ExceptionInterrupt::Interrupt(exc))
         } else if self.cpu.wfi {
             TickResult::WFI
-        } else if word == 0 {
+        } else if let Ok(0) = word {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
-        } else {
+        } else if let Ok(addr) = word {
             log::debug!("executing - mstatus: {mstatus:b}, pc: {pc:x}");
-            match self.run_instruction(word) {
+            match self.run_instruction(addr) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),
             }
+        } else {
+            self.handle_exception(ExceptionInterrupt::Exception(
+                Exception::InstructionAccessFault,
+            ))
         }
     }
 
@@ -244,7 +248,7 @@ impl Emulator {
         dump.push(255);
 
         for idx in 0..self.mem.size() {
-            dump.push(self.mem.rb(idx));
+            dump.push(self.mem.rb(idx).unwrap());
         }
 
         dump.push(255);
@@ -252,18 +256,18 @@ impl Emulator {
         dump.push(255);
         dump.push(255);
 
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_0000)) };
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_0000).unwrap()) };
 
         dump.append(&mut Vec::from(bytes));
 
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4000)) };
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4000).unwrap()) };
         dump.append(&mut Vec::from(bytes));
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4004)) };
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4004).unwrap()) };
         dump.append(&mut Vec::from(bytes));
 
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bff8)) };
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bff8).unwrap()) };
         dump.append(&mut Vec::from(bytes));
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bffc)) };
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bffc).unwrap()) };
         dump.append(&mut Vec::from(bytes));
 
         dump
