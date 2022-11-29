@@ -1,6 +1,7 @@
 use super::{format::*, Instruction};
 use crate::{CSRs, ExceptionInterrupt, Memory, CPU};
 
+#[derive(Debug)]
 pub enum RVPrivileged {
     MRET(RFormat),
     WFI(RFormat),
@@ -46,6 +47,7 @@ fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
 }
 
 fn wfi(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    cpu.pc -= 4;
     cpu.wfi = true;
     Ok(1)
 }
