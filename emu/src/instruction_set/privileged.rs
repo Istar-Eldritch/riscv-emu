@@ -39,7 +39,7 @@ fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
     cpu.pc = cpu.get_csr(CSRs::mepc as u32).unwrap();
     // TODO Set MPP privilege mode.
     let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
-    let mstatus = (mstatus & 1 << 2) | (mstatus & 1 << 6) >> 4;
+    let mstatus = (mstatus & (1 << 2)) | (mstatus & (1 << 6)) >> 4;
     let mstatus = mstatus | 1 << 6;
     cpu.set_csr(CSRs::mstatus as u32, mstatus).unwrap();
     Ok(1)
