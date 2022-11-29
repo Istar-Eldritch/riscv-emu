@@ -82,10 +82,13 @@ impl Emulator {
 
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
+            log::debug!("instruction: {:?}", v);
             v.execute(&mut self.cpu, &mut *self.mem)?
         } else if let Ok(v) = RV32i::try_from(word) {
+            log::debug!("instruction: {:?}", v);
             v.execute(&mut self.cpu, &mut *self.mem)?
         } else {
+            log::debug!("error decoding instruction: {word}");
             return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
         };
 
@@ -158,12 +161,14 @@ impl Emulator {
         }
 
         if let Some(exc) = interrupt {
+            log::debug!("interrupt - mstatus: {mstatus}, exc: {exc:?}");
             self.handle_exception(ExceptionInterrupt::Interrupt(exc))
         } else if self.cpu.wfi {
             TickResult::WFI
         } else if word == 0 {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else {
+            log::debug!("executing - mstatus: {mstatus:b}, pc: {pc}");
             match self.run_instruction(word) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),
@@ -212,10 +217,13 @@ impl Emulator {
     }
 
     pub fn run_program(&mut self) -> Result<(), ExceptionInterrupt> {
+        let mut cycles = 0;
         loop {
+            cycles += 1;
+            log::debug!("cycle: {cycles}");
             match self.tick() {
-                TickResult::Cycles(v) => wait_cycles(self.speed, v),
-                TickResult::WFI => wait_cycles(self.speed, 4), // TODO: This should actually block on a callback  instead of doing polling
+                TickResult::Cycles(_v) => wait_cycles(self.speed, 1),
+                TickResult::WFI => wait_cycles(self.speed, 1), // TODO: This should actually block on a callback  instead of doing polling
                 TickResult::HALT => return Ok(()),
             }
         }
