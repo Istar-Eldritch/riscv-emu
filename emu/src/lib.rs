@@ -96,16 +96,16 @@ impl Emulator {
     fn generate_clint_interrupts(&mut self) {
         use Interrupt::*;
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
-        let msi = mie & (1 << MSoftInterrupt as u32);
+        let msi = (mie & (1 << MSoftInterrupt as u32)) != 0;
         let software_interrupt = self.mem.rw(0x200_0000);
-        if msi != 0 && software_interrupt > 0 {
+        if msi && software_interrupt > 0 {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MSoftInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
             self.mem.ww(0x200_0000, 0);
         }
 
-        let mti = mie & (1 << MTimerInterrupt as u32);
+        let mti = (mie & (1 << MTimerInterrupt as u32)) != 0;
 
         let cmp_time: u64 = self.mem.rw(0x200_4000) as u64;
 
@@ -114,7 +114,8 @@ impl Emulator {
         let time: u64 = self.mem.rw(0x200_bff8) as u64;
         let time: u64 = time | ((self.mem.rw(0x200_bffc) as u64) << 4);
         let time = time + 1;
-        if mti != 0 && time > cmp_time {
+
+        if mti && time >= cmp_time {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MTimerInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
@@ -147,10 +148,16 @@ impl Emulator {
     pub fn tick(&mut self) -> TickResult {
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
+        let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
+        let mstatus_mie = (mstatus & (1 << 3)) != 0;
 
-        self.generate_clint_interrupts();
+        let mut interrupt = None;
+        if mstatus_mie {
+            self.generate_clint_interrupts();
+            interrupt = self.get_interrupt();
+        }
 
-        if let Some(exc) = self.get_interrupt() {
+        if let Some(exc) = interrupt {
             self.handle_exception(ExceptionInterrupt::Interrupt(exc))
         } else if self.cpu.wfi {
             TickResult::WFI
@@ -171,7 +178,7 @@ impl Emulator {
         let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
 
-        match exc {
+        let _mcause = match exc {
             ExceptionInterrupt::Interrupt(i) => {
                 self.cpu.wfi = false;
                 if mstatus_mie != 0 && (mie & (1 << i as u32) != 0) {
@@ -180,7 +187,8 @@ impl Emulator {
                         .unwrap();
                 } else {
                     return TickResult::Cycles(4);
-                }
+                };
+                i as u32
             }
             ExceptionInterrupt::Exception(e) => {
                 match e {
@@ -189,6 +197,7 @@ impl Emulator {
                     }
                     _ => self.cpu.set_csr(CSRs::mcause as u32, e as u32).unwrap(),
                 };
+                e as u32
             }
         };
 
