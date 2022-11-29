@@ -174,13 +174,13 @@ fn ebreak(
 
 /// Load Upper Immediate
 fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = sext(parsed.imm << 12, 20, 32);
+    cpu.x[parsed.rd as usize] = sext(parsed.imm << 12, 32, 32);
     Ok(1)
 }
 
 /// Add Upper Immediate to PC
 fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.pc + sext(parsed.imm << 12, 20, 32);
+    cpu.x[parsed.rd as usize] = cpu.pc + sext(parsed.imm << 12, 32, 32);
     Ok(1)
 }
 
@@ -348,7 +348,8 @@ fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, Excep
 
 fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.ww(addr, cpu.x[parsed.rs2 as usize]);
+    let value = cpu.x[parsed.rs2 as usize];
+    mem.ww(addr, value);
     Ok(1)
 }
 
@@ -619,7 +620,8 @@ fn csrrsi(
             return Err(ExceptionInterrupt::Exception(err));
         }
     };
-    match cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] & 0b11111 | t) {
+    let new_value = cpu.x[parsed.rs1 as usize] | t;
+    match cpu.set_csr(parsed.imm, new_value) {
         Err(err) => {
             return Err(ExceptionInterrupt::Exception(err));
         }
