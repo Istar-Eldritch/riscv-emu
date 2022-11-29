@@ -3,7 +3,7 @@ use super::Instruction;
 use crate::utils::*;
 use crate::{Exception, ExceptionInterrupt, Memory, CPU};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum RV32i {
     /// Load upper immediate
     /// Writes the sign-extended 20-bit immediate, left shifted by 12bits to x[rd] zeroin the lower

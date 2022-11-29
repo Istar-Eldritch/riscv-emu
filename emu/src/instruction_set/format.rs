@@ -68,7 +68,7 @@ impl From<IFormat> for u32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SFormat {
     pub op: u32,
     pub imm0: u32,
@@ -97,7 +97,7 @@ impl From<SFormat> for u32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BFormat {
     pub op: u32,
     pub imm0: u32,
@@ -150,7 +150,7 @@ impl From<u32> for UFormat {
         }
     }
 }
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct JFormat {
     pub rd: u32,
     pub imm0: u32,
