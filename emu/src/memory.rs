@@ -32,7 +32,7 @@ impl MMU {
     fn get_mem_mut(&mut self, addr: u32) -> Box<&mut dyn Memory> {
         match addr {
             v if v <= 0x32000 => Box::new(&mut self.flash), //
-            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Box::new(&mut self.clint),
+            v if v >= 0x200_0000 && v < 0x200_FFFF => Box::new(&mut self.clint),
             _ => {
                 todo!();
             }
@@ -42,7 +42,7 @@ impl MMU {
     fn get_mem(&self, addr: u32) -> Box<&dyn Memory> {
         match addr {
             v if v < 0x32000 => Box::new(&self.flash), //
-            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Box::new(&self.clint),
+            v if v >= 0x200_0000 && v < 0x200_FFFF => Box::new(&self.clint),
             _ => todo!(),
         }
     }
@@ -50,7 +50,7 @@ impl MMU {
     fn translate_address(addr: u32) -> u32 {
         match addr {
             v if v < 0x32000 => addr, //
-            v if v >= 0x0200_0000 && v < 0x0200_FFFF => addr - 0x0200_0000,
+            v if v >= 0x200_0000 && v < 0x200_FFFF => addr - 0x200_0000,
             _ => todo!(),
         }
     }

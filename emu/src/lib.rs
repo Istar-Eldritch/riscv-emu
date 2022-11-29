@@ -81,7 +81,6 @@ impl Emulator {
     }
 
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
-        println!("run");
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
             v.execute(&mut self.cpu, &mut *self.mem)?
         } else if let Ok(v) = RV32i::try_from(word) {
@@ -96,23 +95,26 @@ impl Emulator {
 
     fn generate_clint_interrupts(&mut self) {
         use Interrupt::*;
+        let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
+        let msi = mie & (1 << MSoftInterrupt as u32);
         let software_interrupt = self.mem.rw(0x200_0000);
-        if software_interrupt > 0 {
+        if msi != 0 && software_interrupt > 0 {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MSoftInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
             self.mem.ww(0x200_0000, 0);
         }
 
+        let mti = mie & (1 << MTimerInterrupt as u32);
+
         let cmp_time: u64 = self.mem.rw(0x200_4000) as u64;
 
         let cmp_time: u64 = cmp_time | ((self.mem.rw(0x200_4004) as u64) << 4);
 
         let time: u64 = self.mem.rw(0x200_bff8) as u64;
-        let time: u64 = time | ((self.mem.rw(0x200_bff8 + 4) as u64) << 4);
+        let time: u64 = time | ((self.mem.rw(0x200_bffc) as u64) << 4);
         let time = time + 1;
-
-        if time > cmp_time {
+        if mti != 0 && time > cmp_time {
             let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
             let mip = mip | (1 << MTimerInterrupt as u32);
             self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
@@ -121,15 +123,21 @@ impl Emulator {
         let time32: u32 = time as u32;
         self.mem.ww(0x200_bff8, time32);
         let time32: u32 = (time >> 32) as u32;
-        self.mem.ww(0x200_bff8, time32);
+        self.mem.ww(0x200_bffc, time32);
     }
 
-    fn get_interrupt(&self) -> Option<Interrupt> {
+    fn get_interrupt(&mut self) -> Option<Interrupt> {
         use Interrupt::*;
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        let msi = mip & (1 << MSoftInterrupt as u32);
         match mip {
             // TODO: Handle interrupts for other privilege modes
-            v if (v & (1 << MSoftInterrupt as u32)) != 0 => Some(MSoftInterrupt),
+            _v if msi != 0 => {
+                self.cpu
+                    .set_csr(CSRs::mip as u32, mip & !(1 << MSoftInterrupt as u32))
+                    .unwrap();
+                Some(MSoftInterrupt)
+            }
             v if (v & (1 << MTimerInterrupt as u32)) != 0 => Some(MTimerInterrupt),
             v if (v & (1 << MExternalInterrupt as u32)) != 0 => Some(MExternalInterrupt),
             _ => None,
@@ -143,9 +151,8 @@ impl Emulator {
         self.generate_clint_interrupts();
 
         if let Some(exc) = self.get_interrupt() {
-            self.handle_exception(ExceptionInterrupt::Interrupt(exc));
-        }
-        if self.cpu.wfi {
+            self.handle_exception(ExceptionInterrupt::Interrupt(exc))
+        } else if self.cpu.wfi {
             TickResult::WFI
         } else if word == 0 {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
@@ -161,11 +168,12 @@ impl Emulator {
     fn handle_exception(&mut self, exc: ExceptionInterrupt) -> TickResult {
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
 
-        let mstatus_mie = mstatus & (1 << 2);
+        let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
 
-        let code = match exc {
+        match exc {
             ExceptionInterrupt::Interrupt(i) => {
+                self.cpu.wfi = false;
                 if mstatus_mie != 0 && (mie & (1 << i as u32) != 0) {
                     self.cpu
                         .set_csr(CSRs::mcause as u32, i as u32 | (1 << 31))
@@ -173,39 +181,34 @@ impl Emulator {
                 } else {
                     return TickResult::Cycles(4);
                 }
-                i as u32
             }
             ExceptionInterrupt::Exception(e) => {
-                self.cpu.set_csr(CSRs::mcause as u32, e as u32).unwrap();
-                e as u32
+                match e {
+                    Exception::MEnvironmentCall if self.cpu.x[15] == 255 => {
+                        return TickResult::HALT
+                    }
+                    _ => self.cpu.set_csr(CSRs::mcause as u32, e as u32).unwrap(),
+                };
             }
         };
 
-        let mstatus = (mstatus & !(1 << 2)) | mstatus_mie << 4; // move mie to mpie and set mie to 0 (disable interrupts)
+        let mstatus = (mstatus & !(1 << 3)) | mstatus_mie << 4; // move mie to mpie and set mie to 0 (disable interrupts)
         self.cpu.set_csr(CSRs::mstatus as u32, mstatus).unwrap();
         self.cpu.set_csr(CSRs::mepc as u32, self.cpu.pc).unwrap();
         self.cpu.set_csr(CSRs::mtval as u32, self.cpu.pc).unwrap(); // TODO: How do we bubble up suporting data?
                                                                     // TODO: Set privilege mode on msatus.MPP
         let mtvec = self.cpu.get_csr(CSRs::mtvec as u32).unwrap();
-        let mode = mtvec & 0b11;
-        let base = (mtvec & !0b11) >> 2;
-
-        // TODO: If there is no trap, halt execution
-        let pcv = if mode == 0 { base } else { base + (4 * code) };
-        self.cpu.pc = pcv;
-
+        self.cpu.pc = mtvec;
         TickResult::Cycles(4)
     }
 
     pub fn run_program(&mut self) -> Result<(), ExceptionInterrupt> {
         loop {
-            let res = self.tick();
-            let cycles = if let TickResult::Cycles(v) = res {
-                v
-            } else {
-                4
-            };
-            wait_cycles(self.speed, cycles);
+            match self.tick() {
+                TickResult::Cycles(v) => wait_cycles(self.speed, v),
+                TickResult::WFI => wait_cycles(self.speed, 4), // TODO: This should actually block on a callback  instead of doing polling
+                TickResult::HALT => return Ok(()),
+            }
         }
     }
 
@@ -218,9 +221,34 @@ impl Emulator {
                 dump.push(b);
             }
         }
+        dump.push(255);
+        dump.push(255);
+        dump.push(255);
+        dump.push(255);
+
         for idx in 0..self.mem.size() {
             dump.push(self.mem.rb(idx));
         }
+
+        dump.push(255);
+        dump.push(255);
+        dump.push(255);
+        dump.push(255);
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_0000)) };
+
+        dump.append(&mut Vec::from(bytes));
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4000)) };
+        dump.append(&mut Vec::from(bytes));
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4004)) };
+        dump.append(&mut Vec::from(bytes));
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bff8)) };
+        dump.append(&mut Vec::from(bytes));
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bffc)) };
+        dump.append(&mut Vec::from(bytes));
+
         dump
     }
 }
@@ -261,16 +289,6 @@ impl CPU {
             csr: [0; 8],
             wfi: false,
         }
-    }
-
-    fn exception(&mut self, exc: ExceptionInterrupt, extra: u32) {
-        let cause = match exc {
-            ExceptionInterrupt::Exception(c) => c as u32,
-            ExceptionInterrupt::Interrupt(c) => c as u32, // TODO: Init MIP
-        };
-        self.set_csr(CSRs::mcause as u32, cause).unwrap();
-        self.set_csr(CSRs::mepc as u32, self.pc).unwrap();
-        self.set_csr(CSRs::mtval as u32, extra).unwrap();
     }
 
     fn csr_idx_map(v: u32) -> Result<usize, Exception> {
