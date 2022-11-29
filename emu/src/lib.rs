@@ -161,14 +161,14 @@ impl Emulator {
         }
 
         if let Some(exc) = interrupt {
-            log::debug!("interrupt - mstatus: {mstatus}, exc: {exc:?}");
+            log::debug!("interrupt - mstatus: {mstatus}, exc: {exc:?}, pc: {pc:x}");
             self.handle_exception(ExceptionInterrupt::Interrupt(exc))
         } else if self.cpu.wfi {
             TickResult::WFI
         } else if word == 0 {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else {
-            log::debug!("executing - mstatus: {mstatus:b}, pc: {pc}");
+            log::debug!("executing - mstatus: {mstatus:b}, pc: {pc:x}");
             match self.run_instruction(word) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),

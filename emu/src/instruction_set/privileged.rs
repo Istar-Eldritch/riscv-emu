@@ -37,7 +37,7 @@ impl Instruction for RVPrivileged {
 }
 
 fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.pc = cpu.get_csr(CSRs::mepc as u32).unwrap();
+    cpu.pc = cpu.get_csr(CSRs::mepc as u32).unwrap() - 4;
     // TODO Set MPP privilege mode.
     let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
     let mstatus = (mstatus & (1 << 2)) | (mstatus & (1 << 6)) >> 4;
@@ -47,7 +47,6 @@ fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
 }
 
 fn wfi(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.pc -= 4;
     cpu.wfi = true;
     Ok(1)
 }
