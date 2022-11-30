@@ -1,6 +1,8 @@
 mod clint;
 mod generic;
+mod mapped_memory;
 mod mmu;
+mod plic;
 
 pub use generic::GenericMemory;
 pub use mmu::MMU;
@@ -11,8 +13,6 @@ pub enum MemoryError {
 }
 
 pub trait Memory {
-    fn size(&self) -> u32;
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError>;
 
     fn wb(&mut self, addr: u32, value: u8) -> Result<(), MemoryError>;

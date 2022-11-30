@@ -247,7 +247,7 @@ impl Emulator {
         dump.push(255);
         dump.push(255);
 
-        for idx in 0..self.mem.size() {
+        for idx in 0..0x32000 {
             dump.push(self.mem.rb(idx).unwrap());
         }
 

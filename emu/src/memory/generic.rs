@@ -23,12 +23,7 @@ impl GenericMemory {
     }
 }
 
-// TODO: Memory should be safe to access. Check out of bounds
 impl Memory for GenericMemory {
-    fn size(&self) -> u32 {
-        self.size
-    }
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         self.validate(addr, 1)?;
         Ok(unsafe { read_volatile((self.addr as usize + addr as usize) as *const u8) })
