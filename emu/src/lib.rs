@@ -121,7 +121,6 @@ impl Emulator {
 
         let time: u64 = self.mem.rw(0x200_bff8).unwrap() as u64;
         let time: u64 = time | ((self.mem.rw(0x200_bffc).unwrap() as u64) << 4);
-        let time = time + 1;
 
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_mti = if cmp_time != 0 && time >= cmp_time {
@@ -130,11 +129,6 @@ impl Emulator {
             mip & !(1 << MTimerInterrupt as u32)
         };
         self.cpu.set_csr(CSRs::mip as u32, mip_mti).unwrap();
-
-        let time32: u32 = time as u32;
-        self.mem.ww(0x200_bff8, time32).unwrap();
-        let time32: u32 = (time >> 32) as u32;
-        self.mem.ww(0x200_bffc, time32).unwrap();
     }
 
     /// External interrupt pending bit check
@@ -178,6 +172,7 @@ impl Emulator {
     }
 
     pub fn tick(&mut self) -> TickResult {
+        self.mem.tick();
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();

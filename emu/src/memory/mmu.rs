@@ -1,11 +1,10 @@
 use super::clint::CLINT;
-use super::mapped_memory::MappedMemory;
 use super::plic::PLIC;
 use super::{GenericMemory, Memory, MemoryError};
 
 pub struct MMU {
     flash: GenericMemory,
-    clint: MappedMemory<CLINT>,
+    clint: CLINT,
     plic: PLIC,
 }
 
@@ -13,7 +12,7 @@ impl MMU {
     pub fn new() -> Self {
         Self {
             flash: GenericMemory::new(0x32000),
-            clint: MappedMemory::new(CLINT::new()),
+            clint: CLINT::new(),
             plic: PLIC::new(),
         }
     }
@@ -46,6 +45,10 @@ impl MMU {
 }
 
 impl Memory for MMU {
+    fn tick(&mut self) {
+        self.clint.tick();
+    }
+
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         self.get_mem(addr)?.rb(MMU::translate_address(addr)?)
     }

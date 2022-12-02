@@ -1,5 +1,5 @@
-use super::mapped_memory::TMappedMemory;
 use super::MemoryError;
+use crate::Memory;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -17,12 +17,55 @@ impl CLINT {
     }
 }
 
-impl TMappedMemory for CLINT {
-    fn translate_address(addr: u32) -> Result<usize, MemoryError> {
+impl Memory for CLINT {
+    fn tick(&mut self) -> () {
+        self.mtime += 1
+    }
+
+    fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn wb(&mut self, _addr: u32, _value: u8) -> Result<(), MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn rhw(&self, _addr: u32) -> Result<u16, MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn whw(&mut self, _addr: u32, _value: u16) -> Result<(), MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn rw(&self, addr: u32) -> Result<u32, MemoryError> {
         match addr {
-            v if v < 4 => Ok(0 + v as usize),
-            v if v >= 0x4000 && v < 0x4008 => Ok(4 + (v - 0x4000) as usize),
-            v if v >= 0xbff8 && v < (0xbff8 + 8) => Ok(12 + (v - 0xbff8) as usize),
+            0 => Ok(self.msip0),
+            0x4000 => Ok(self.mtimecmp as u32),
+            0x4004 => Ok((self.mtimecmp >> 32) as u32),
+            0xbff8 => Ok(self.mtime as u32),
+            0xbffc => Ok((self.mtime >> 32) as u32),
+            _ => Err(MemoryError::AccessFault),
+        }
+    }
+
+    fn ww(&mut self, addr: u32, value: u32) -> Result<(), MemoryError> {
+        match addr {
+            0 => {
+                self.msip0 = value;
+                Ok(())
+            }
+            0x4000 => {
+                self.mtimecmp = (self.mtimecmp & !0xffff_ffff) | value as u64;
+                Ok(())
+            }
+            0x4004 => {
+                self.mtimecmp = (self.mtimecmp & !(0xffff_ffff << 32)) | ((value as u64) << 32);
+                Ok(())
+            }
+            0xbff8 => Ok(()),
+            0xbffc => Ok(()),
+            v if v == 0xbff8 || v == (0xbff8 + 4) => Ok(()),
             _ => Err(MemoryError::AccessFault),
         }
     }

@@ -13,6 +13,8 @@ pub enum MemoryError {
 }
 
 pub trait Memory {
+    fn tick(&mut self) -> ();
+
     fn rb(&self, addr: u32) -> Result<u8, MemoryError>;
 
     fn wb(&mut self, addr: u32, value: u8) -> Result<(), MemoryError>;

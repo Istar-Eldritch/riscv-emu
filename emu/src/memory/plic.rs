@@ -49,6 +49,9 @@ impl PLIC {
 }
 
 impl Memory for PLIC {
+    fn tick(&mut self) {
+        ()
+    }
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
         Err(MemoryError::AccessFault)
     }

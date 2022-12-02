@@ -15,6 +15,10 @@ impl<T: TMappedMemory> MappedMemory<T> {
 }
 
 impl<T: TMappedMemory> Memory for MappedMemory<T> {
+    fn tick(&mut self) {
+        ()
+    }
+
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         let shift = T::translate_address(addr)?;
         let ptr: *const Self = self;
