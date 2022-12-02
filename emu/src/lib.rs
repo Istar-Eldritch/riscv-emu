@@ -222,13 +222,21 @@ impl Emulator {
 
     pub fn run_program(&mut self) -> Result<(), ExceptionInterrupt> {
         let mut cycles = 0;
+        let mut pending_work = 0;
         loop {
-            cycles += 1;
-            log::debug!("cycle: {cycles}");
-            match self.tick() {
-                TickResult::Cycles(_v) => wait_cycles(self.speed, 1),
-                TickResult::WFI => wait_cycles(self.speed, 1), // TODO: This should actually block on a callback  instead of doing polling
-                TickResult::HALT => return Ok(()),
+            if pending_work > 0 {
+                cycles += 1;
+                pending_work -= 1;
+                wait_cycles(self.speed, 1);
+            } else {
+                match self.tick() {
+                    TickResult::Cycles(v) => {
+                        log::debug!("cycle: {cycles}");
+                        pending_work += v
+                    }
+                    TickResult::WFI => pending_work += 1, // TODO: This should actually block on a callback  instead of doing polling
+                    TickResult::HALT => return Ok(()),
+                }
             }
         }
     }
