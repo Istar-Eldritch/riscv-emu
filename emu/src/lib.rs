@@ -96,16 +96,24 @@ impl Emulator {
         Ok(v)
     }
 
-    // TODO Rename
-    fn generate_clint_interrupts(&mut self) {
-        use Interrupt::*;
+    /// Software interrupt pending check
+    fn update_mip_msip(&mut self) {
         let software_interrupt = self.mem.rw(0x200_0000).unwrap();
-        if software_interrupt > 0 {
-            let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-            let mip = mip | (1 << MSoftInterrupt as u32);
-            self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
+
+        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_msi = if software_interrupt > 0 {
             self.mem.ww(0x200_0000, 0).unwrap();
-        }
+            mip | (1 << Interrupt::MSoftInterrupt as u32)
+        } else {
+            mip & !(1 << Interrupt::MSoftInterrupt as u32)
+        };
+
+        self.cpu.set_csr(CSRs::mip as u32, mip_msi).unwrap();
+    }
+
+    /// Timer interrupt pending check
+    fn update_mip_mtip(&mut self) {
+        use Interrupt::*;
 
         let cmp_time: u64 = self.mem.rw(0x200_4000).unwrap() as u64;
 
@@ -115,11 +123,13 @@ impl Emulator {
         let time: u64 = time | ((self.mem.rw(0x200_bffc).unwrap() as u64) << 4);
         let time = time + 1;
 
-        if cmp_time != 0 && time >= cmp_time {
-            let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-            let mip = mip | (1 << MTimerInterrupt as u32);
-            self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
-        }
+        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_mti = if cmp_time != 0 && time >= cmp_time {
+            mip | (1 << MTimerInterrupt as u32)
+        } else {
+            mip & !(1 << MTimerInterrupt as u32)
+        };
+        self.cpu.set_csr(CSRs::mip as u32, mip_mti).unwrap();
 
         let time32: u32 = time as u32;
         self.mem.ww(0x200_bff8, time32).unwrap();
@@ -127,15 +137,18 @@ impl Emulator {
         self.mem.ww(0x200_bffc, time32).unwrap();
     }
 
-    // TODO: Rename
-    fn gen_plic_interrupts(&mut self) {
+    /// External interrupt pending bit check
+    fn update_mip_meip(&mut self) {
         let external_interrupts =
             self.mem.rw(0x1000).unwrap() as u64 | ((self.mem.rw(0x1004).unwrap() as u64) << 4);
-        if external_interrupts != 0 {
-            let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-            let mip = mip | (1 << Interrupt::MExternalInterrupt as u32);
-            self.cpu.set_csr(CSRs::mip as u32, mip).unwrap();
-        }
+        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_mei = if external_interrupts != 0 {
+            mip | (1 << Interrupt::MExternalInterrupt as u32)
+        } else {
+            mip & !(1 << Interrupt::MExternalInterrupt as u32)
+        };
+
+        self.cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
     }
 
     fn get_interrupt(&mut self) -> Option<Interrupt> {
@@ -172,8 +185,9 @@ impl Emulator {
 
         let mut interrupt = None;
         if mstatus_mie {
-            self.generate_clint_interrupts();
-            self.gen_plic_interrupts();
+            self.update_mip_msip();
+            self.update_mip_mtip();
+            self.update_mip_meip();
             interrupt = self.get_interrupt();
         }
 
