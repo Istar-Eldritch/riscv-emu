@@ -6,7 +6,7 @@ pub struct PLIC {
     pub pending: RefCell<u64>,      // addr 0xd0
     pub h0mie: u64,                 // hart0 M-Mode interrupt enables - addr 216
     pub h0mpt: u32,                 // hart0 M-Mode priority threshold - addr 224
-    pub h0mcc: u32,                 // hart0 M-Mode claim/complete - addr 228
+                                    // hart0 M-Mode claim/complete - addr 228
 }
 
 impl PLIC {
@@ -16,7 +16,6 @@ impl PLIC {
             pending: RefCell::new(0),
             h0mie: 0,
             h0mpt: 0,
-            h0mcc: 0,
         }
     }
 
@@ -71,18 +70,10 @@ impl Memory for PLIC {
     fn rw(&self, addr: u32) -> Result<u32, MemoryError> {
         match addr {
             v if v >= 0x4 && v < 0xd4 => Ok(self.source_priority[((v - 4) / 4) as usize]),
-            v if v == 0x1000 && v == 0x1004 => {
-                let pending: *const u64 = &*self.pending.borrow();
-                let shift = v - 0x1000;
-                let to_read: *const u32 = ((pending as u32) + shift) as *const u32;
-                unsafe { Ok(*to_read) }
-            }
-            v if v == 0x2000 || v == 0x2004 => {
-                let h0mie: *const u64 = &self.h0mie;
-                let shift = v - 0x2000;
-                let to_read: *const u32 = ((h0mie as u32) + shift) as *const u32;
-                unsafe { Ok(*to_read) }
-            }
+            0x1000 => Ok(*self.pending.borrow() as u32),
+            0x1004 => Ok((*self.pending.borrow() >> 32) as u32),
+            0x2000 => Ok(self.h0mie as u32),
+            0x2004 => Ok((self.h0mie >> 32) as u32),
             0x20_0000 => Ok(self.h0mpt),
             0x20_0004 => {
                 // XXX: Should we keep a list of claimed interrupts?
@@ -102,18 +93,16 @@ impl Memory for PLIC {
                 self.source_priority[((v - 4) / 4) as usize] = value;
                 Ok(())
             }
-            v if v == 0x1000 && v == 0x1004 => {
-                let pending: *const u64 = &*self.pending.borrow();
-                let shift = v - 0x1000;
-                let to_write: *mut u32 = ((pending as u32) + shift) as *mut u32;
-                unsafe { *to_write = value };
+            v if v == 0x1000 || v == 0x1004 => {
+                // pending is not writable
                 Ok(())
             }
-            v if v == 0x2000 || v == 0x2004 => {
-                let h0mie: *const u64 = &self.h0mie;
-                let shift = v - 0x2000;
-                let to_write: *mut u32 = ((h0mie as u32) + shift) as *mut u32;
-                unsafe { *to_write = value };
+            0x2000 => {
+                self.h0mie = (self.h0mie & !0xffff_ffff) | value as u64;
+                Ok(())
+            }
+            0x2004 => {
+                self.h0mie = (self.h0mie & !(0xffff_ffff << 32)) | (value as u64) << 32;
                 Ok(())
             }
             0x20_0000 => {
