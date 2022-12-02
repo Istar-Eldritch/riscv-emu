@@ -6,7 +6,7 @@ use super::{GenericMemory, Memory, MemoryError};
 pub struct MMU {
     flash: GenericMemory,
     clint: MappedMemory<CLINT>,
-    plic: MappedMemory<PLIC>,
+    plic: PLIC,
 }
 
 impl MMU {
@@ -14,7 +14,7 @@ impl MMU {
         Self {
             flash: GenericMemory::new(0x32000),
             clint: MappedMemory::new(CLINT::new()),
-            plic: MappedMemory::new(PLIC::new()),
+            plic: PLIC::new(),
         }
     }
     fn get_mem_mut(&mut self, addr: u32) -> Result<Box<&mut dyn Memory>, MemoryError> {

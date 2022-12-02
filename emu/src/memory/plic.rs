@@ -1,5 +1,4 @@
-use super::mapped_memory::TMappedMemory;
-use super::MemoryError;
+use super::{Memory, MemoryError};
 
 pub struct PLIC {
     pub source_priority: [u32; 52], // addr 0x0
@@ -19,16 +18,102 @@ impl PLIC {
             h0mcc: 0,
         }
     }
+
+    // Returns the enabled and pending interrupts ordered by priority
+    pub fn get_interrupts(&self) -> Vec<u32> {
+        let mut interrupts = Vec::new();
+        for i in 0..52 {
+            let code = 1 << i;
+            let priority = self.source_priority[code as usize];
+            if self.h0mie & code != 0 && self.pending & code != 0 && priority >= self.h0mpt {
+                interrupts.push(i);
+            }
+        }
+        interrupts.sort_by(|a, b| {
+            let pa = self.source_priority[*a as usize];
+            let pb = self.source_priority[*b as usize];
+            pa.cmp(&pb)
+        });
+        interrupts
+    }
+
+    pub fn interrupt(&mut self, v: u64) {
+        // XXX: if the interrupt is enabled should we ignore adding the pending bit?
+        self.pending = self.pending | v;
+    }
 }
 
-impl TMappedMemory for PLIC {
-    fn translate_address(addr: u32) -> Result<usize, MemoryError> {
+impl Memory for PLIC {
+    fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn wb(&mut self, _addr: u32, _value: u8) -> Result<(), MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn rhw(&self, _addr: u32) -> Result<u16, MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn whw(&mut self, _addr: u32, _value: u16) -> Result<(), MemoryError> {
+        Err(MemoryError::AccessFault)
+    }
+
+    fn rw(&self, addr: u32) -> Result<u32, MemoryError> {
         match addr {
-            v if v >= 0x4 && v < 0xd4 => Ok((v - 4) as usize),
-            v if v >= 0x1000 && v < 0x1008 => Ok(0xd4 + (v - 0x1000) as usize),
-            v if v >= 0x2000 && v < 0x2008 => Ok(0xdc + (v - 0x2000) as usize),
-            v if v >= 0x20_0000 && v < 0x20_0004 => Ok(0xe4 + (v - 0x20_0000) as usize),
-            v if v >= 0x20_0004 && v < 0x20_0008 => Ok(0xe8 + (v - 0x20_0004) as usize),
+            v if v >= 0x4 && v < 0xd4 => Ok(self.source_priority[((v - 4) / 4) as usize]),
+            v if v == 0x1000 && v == 0x1004 => {
+                let pending: *const u64 = &self.pending;
+                let shift = v - 0x1000;
+                let to_read: *const u32 = ((pending as u32) + shift) as *const u32;
+                unsafe { Ok(*to_read) }
+            }
+            v if v == 0x2000 || v == 0x2004 => {
+                let h0mie: *const u64 = &self.h0mie;
+                let shift = v - 0x2000;
+                let to_read: *const u32 = ((h0mie as u32) + shift) as *const u32;
+                unsafe { Ok(*to_read) }
+            }
+            0x20_0000 => Ok(self.h0mpt),
+            0x20_0004 => {
+                // XXX: Should we keep a list of claimed interrupts?
+                let mut interrupts = self.get_interrupts();
+                Ok(interrupts.pop().unwrap_or(0))
+            }
+            _ => Err(MemoryError::AccessFault),
+        }
+    }
+
+    fn ww(&mut self, addr: u32, value: u32) -> Result<(), MemoryError> {
+        match addr {
+            v if v >= 0x4 && v < 0xd4 => {
+                self.source_priority[((v - 4) / 4) as usize] = value;
+                Ok(())
+            }
+            v if v == 0x1000 && v == 0x1004 => {
+                let pending: *const u64 = &self.pending;
+                let shift = v - 0x1000;
+                let to_write: *mut u32 = ((pending as u32) + shift) as *mut u32;
+                unsafe { *to_write = value };
+                Ok(())
+            }
+            v if v == 0x2000 || v == 0x2004 => {
+                let h0mie: *const u64 = &self.h0mie;
+                let shift = v - 0x2000;
+                let to_write: *mut u32 = ((h0mie as u32) + shift) as *mut u32;
+                unsafe { *to_write = value };
+                Ok(())
+            }
+            0x20_0000 => {
+                self.h0mpt = value;
+                Ok(())
+            }
+            0x20_0004 => {
+                // Just disabled the interrupt
+                self.pending = self.pending & !(1 << value);
+                Ok(())
+            }
             _ => Err(MemoryError::AccessFault),
         }
     }
