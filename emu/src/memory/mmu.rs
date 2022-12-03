@@ -1,11 +1,13 @@
 use super::clint::CLINT;
 use super::plic::PLIC;
+use super::uart::UART;
 use super::{GenericMemory, Memory, MemoryError};
 
 pub struct MMU {
     flash: GenericMemory,
     clint: CLINT,
     plic: PLIC,
+    uart0: UART,
 }
 
 impl MMU {
@@ -14,31 +16,35 @@ impl MMU {
             flash: GenericMemory::new(0x32000),
             clint: CLINT::new(),
             plic: PLIC::new(),
+            uart0: UART::new(None),
         }
     }
     fn get_mem_mut(&mut self, addr: u32) -> Result<Box<&mut dyn Memory>, MemoryError> {
         match addr {
-            v if v <= 0x32000 => Ok(Box::new(&mut self.flash)), //
-            v if v >= 0x200_0000 && v < 0x200_FFFF => Ok(Box::new(&mut self.clint)),
-            v if v >= 0xC00_0000 && v < 0x1000_0000 => Ok(Box::new(&mut self.plic)),
+            v if v <= 0x0003_2000 => Ok(Box::new(&mut self.flash)), //
+            v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&mut self.clint)),
+            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&mut self.plic)),
+            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(Box::new(&mut self.uart0)),
             _ => Err(MemoryError::AccessFault),
         }
     }
 
     fn get_mem(&self, addr: u32) -> Result<Box<&dyn Memory>, MemoryError> {
         match addr {
-            v if v < 0x32000 => Ok(Box::new(&self.flash)), //
-            v if v >= 0x200_0000 && v < 0x200_FFFF => Ok(Box::new(&self.clint)),
-            v if v >= 0xC00_0000 && v < 0x1000_0000 => Ok(Box::new(&self.plic)),
+            v if v <= 0x0003_2000 => Ok(Box::new(&self.flash)), //
+            v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&self.clint)),
+            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&self.plic)),
+            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(Box::new(&self.uart0)),
             _ => Err(MemoryError::AccessFault),
         }
     }
 
     fn translate_address(addr: u32) -> Result<u32, MemoryError> {
         match addr {
-            v if v < 0x32000 => Ok(addr), //
+            v if v <= 0x32000 => Ok(addr), //
             v if v >= 0x200_0000 && v < 0x200_FFFF => Ok(addr - 0x200_0000),
             v if v >= 0xC00_0000 && v < 0x1000_0000 => Ok(addr - 0xC00_0000),
+            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(addr - 0x1001_0000),
             _ => Err(MemoryError::AccessFault),
         }
     }
