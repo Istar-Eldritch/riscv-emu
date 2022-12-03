@@ -3,7 +3,7 @@ mod memory;
 mod utils;
 
 use instruction_set::{privileged::RVPrivileged, rv32i::RV32i, Instruction};
-use memory::{Memory, MMU};
+use memory::{ClockedMemory, Memory, MMU};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Interrupt {
@@ -49,7 +49,7 @@ impl std::error::Error for ExceptionInterrupt {}
 
 pub struct Emulator {
     cpu: CPU,
-    mem: Box<dyn Memory>,
+    mem: Box<dyn ClockedMemory>,
     speed: u32, // speed in hz
 }
 
@@ -83,10 +83,10 @@ impl Emulator {
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
             log::debug!("instruction: {:?}", v);
-            v.execute(&mut self.cpu, &mut *self.mem)?
+            v.execute(&mut self.cpu, self.mem.as_mut_mem())?
         } else if let Ok(v) = RV32i::try_from(word) {
             log::debug!("instruction: {:?}", v);
-            v.execute(&mut self.cpu, &mut *self.mem)?
+            v.execute(&mut self.cpu, self.mem.as_mut_mem())?
         } else {
             log::debug!("error decoding instruction: {word}");
             return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
@@ -172,7 +172,7 @@ impl Emulator {
     }
 
     pub fn tick(&mut self) -> TickResult {
-        self.mem.tick();
+        self.mem.tick(());
         let pc = self.cpu.pc;
         let word = self.mem.rw(pc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();

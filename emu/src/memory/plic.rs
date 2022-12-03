@@ -1,4 +1,5 @@
-use super::{Memory, MemoryError};
+use super::{uart::UART, Memory, MemoryError};
+use crate::memory::Clocked;
 use std::cell::RefCell;
 
 pub struct PLIC {
@@ -39,18 +40,22 @@ impl PLIC {
         });
         interrupts
     }
+}
 
-    pub fn interrupt(&mut self, v: u64) {
-        // XXX: if the interrupt is enabled should we ignore adding the pending bit?
+impl Clocked<&UART> for PLIC {
+    fn tick(&mut self, uart0: &UART) {
         let mut pending = self.pending.borrow_mut();
-        *pending = *pending | v;
+
+        let uart0_ip = uart0.rw(0x14).unwrap();
+        if uart0_ip != 0 {
+            *pending |= 0b10 as u64;
+        } else {
+            *pending &= !(0b10 as u64);
+        };
     }
 }
 
 impl Memory for PLIC {
-    fn tick(&mut self) {
-        ()
-    }
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
         Err(MemoryError::AccessFault)
     }

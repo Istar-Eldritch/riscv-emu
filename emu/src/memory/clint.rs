@@ -1,4 +1,5 @@
 use super::MemoryError;
+use crate::memory::Clocked;
 use crate::Memory;
 
 pub struct CLINT {
@@ -17,11 +18,13 @@ impl CLINT {
     }
 }
 
-impl Memory for CLINT {
-    fn tick(&mut self) -> () {
+impl Clocked<()> for CLINT {
+    fn tick(&mut self, _: ()) -> () {
         self.mtime += 1
     }
+}
 
+impl Memory for CLINT {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
         Err(MemoryError::AccessFault)
     }

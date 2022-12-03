@@ -1,13 +1,30 @@
 use super::clint::CLINT;
 use super::plic::PLIC;
 use super::uart::UART;
-use super::{GenericMemory, Memory, MemoryError};
+use super::{Clocked, ClockedMemory, GenericMemory, Memory, MemoryError};
 
 pub struct MMU {
     flash: GenericMemory,
     clint: CLINT,
     plic: PLIC,
     uart0: UART,
+}
+
+impl Clocked<()> for MMU {
+    fn tick(&mut self, _: ()) {
+        self.clint.tick(());
+        self.uart0.tick(());
+        self.plic.tick(&self.uart0);
+    }
+}
+
+impl ClockedMemory for MMU {
+    fn as_mem(&self) -> &dyn Memory {
+        self
+    }
+    fn as_mut_mem(&mut self) -> &mut dyn Memory {
+        self
+    }
 }
 
 impl MMU {
@@ -51,10 +68,6 @@ impl MMU {
 }
 
 impl Memory for MMU {
-    fn tick(&mut self) {
-        self.clint.tick();
-    }
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         self.get_mem(addr)?.rb(MMU::translate_address(addr)?)
     }

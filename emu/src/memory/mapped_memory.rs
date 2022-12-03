@@ -9,16 +9,13 @@ pub trait TMappedMemory {
 pub struct MappedMemory<T: TMappedMemory>(T);
 
 impl<T: TMappedMemory> MappedMemory<T> {
+    #[allow(dead_code)]
     pub fn new(t: T) -> Self {
         Self(t)
     }
 }
 
 impl<T: TMappedMemory> Memory for MappedMemory<T> {
-    fn tick(&mut self) {
-        ()
-    }
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         let shift = T::translate_address(addr)?;
         let ptr: *const Self = self;

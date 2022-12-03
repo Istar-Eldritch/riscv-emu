@@ -1,3 +1,4 @@
+use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -48,8 +49,8 @@ impl UART {
     }
 }
 
-impl Memory for UART {
-    fn tick(&mut self) -> () {
+impl Clocked<()> for UART {
+    fn tick(&mut self, _: ()) -> () {
         let mut r_fifo = self.r_fifo.borrow_mut();
         if let Some(device) = &mut self.device {
             // rxen = 1
@@ -83,7 +84,9 @@ impl Memory for UART {
             self.ip = self.ip & !0b01;
         }
     }
+}
 
+impl Memory for UART {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {
         Err(MemoryError::AccessFault)
     }

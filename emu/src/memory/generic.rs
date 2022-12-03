@@ -24,10 +24,6 @@ impl GenericMemory {
 }
 
 impl Memory for GenericMemory {
-    fn tick(&mut self) {
-        ()
-    }
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         self.validate(addr, 1)?;
         Ok(unsafe { read_volatile((self.addr as usize + addr as usize) as *const u8) })

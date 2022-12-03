@@ -6,7 +6,16 @@ mod plic;
 mod uart;
 
 pub use generic::GenericMemory;
-pub use mmu::MMU;
+pub use mmu::*;
+
+pub trait Clocked<T> {
+    fn tick(&mut self, deps: T);
+}
+
+pub trait ClockedMemory: Clocked<()> + Memory {
+    fn as_mem(&self) -> &dyn Memory;
+    fn as_mut_mem(&mut self) -> &mut dyn Memory;
+}
 
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum MemoryError {
@@ -14,8 +23,6 @@ pub enum MemoryError {
 }
 
 pub trait Memory {
-    fn tick(&mut self) -> ();
-
     fn rb(&self, addr: u32) -> Result<u8, MemoryError>;
 
     fn wb(&mut self, addr: u32, value: u8) -> Result<(), MemoryError>;
