@@ -1,9 +1,11 @@
 mod instruction_set;
-mod memory;
+pub mod memory;
+mod terminal;
 mod utils;
 
 use instruction_set::{privileged::RVPrivileged, rv32i::RV32i, Instruction};
-use memory::{ClockedMemory, Memory, MMU};
+use memory::{uart::UARTDevice, ClockedMemory, Memory, MMU};
+pub use terminal::TermEmulator;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Interrupt {
@@ -66,10 +68,10 @@ pub enum TickResult {
 }
 
 impl Emulator {
-    pub fn new(speed: u32) -> Self {
+    pub fn new(speed: u32, terminal: Option<Box<dyn UARTDevice>>) -> Self {
         Emulator {
             cpu: CPU::new(),
-            mem: Box::new(MMU::new()),
+            mem: Box::new(MMU::new(terminal)),
             speed,
         }
     }

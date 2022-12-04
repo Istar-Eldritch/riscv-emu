@@ -3,7 +3,7 @@ mod generic;
 mod mapped_memory;
 mod mmu;
 mod plic;
-mod uart;
+pub mod uart;
 
 pub use generic::GenericMemory;
 pub use mmu::*;

@@ -1,5 +1,5 @@
 use clap::{command, Parser};
-use riscv_emu::Emulator;
+use riscv_emu::{Emulator, TermEmulator};
 use std::fs;
 use std::io::{BufReader, BufWriter, Read, Write};
 
@@ -28,7 +28,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     br.read_to_end(&mut mem)?;
 
     log::info!("Flash memory loaded");
-    let mut emu = Emulator::new(args.speed.unwrap_or(1));
+    let mut term = TermEmulator::new();
+    term.lock();
+    let mut emu = Emulator::new(args.speed.unwrap_or(1), Some(Box::new(term)));
     emu.flash(mem);
     emu.run_program()?;
     log::info!("Program ended execution");

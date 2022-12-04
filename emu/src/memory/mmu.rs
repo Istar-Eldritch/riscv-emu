@@ -1,6 +1,6 @@
 use super::clint::CLINT;
 use super::plic::PLIC;
-use super::uart::UART;
+use super::uart::{UARTDevice, UART};
 use super::{Clocked, ClockedMemory, GenericMemory, Memory, MemoryError};
 
 pub struct MMU {
@@ -28,12 +28,12 @@ impl ClockedMemory for MMU {
 }
 
 impl MMU {
-    pub fn new() -> Self {
+    pub fn new(terminal: Option<Box<dyn UARTDevice>>) -> Self {
         Self {
             flash: GenericMemory::new(0x32000),
             clint: CLINT::new(),
             plic: PLIC::new(),
-            uart0: UART::new(None),
+            uart0: UART::new(terminal),
         }
     }
     fn get_mem_mut(&mut self, addr: u32) -> Result<Box<&mut dyn Memory>, MemoryError> {

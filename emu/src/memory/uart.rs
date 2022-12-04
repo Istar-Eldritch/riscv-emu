@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 
 pub trait UARTDevice {
-    fn read(&self) -> Option<u8>;
+    fn read(&mut self) -> Option<u8>;
     fn write(&mut self, byte: u8);
 }
 
