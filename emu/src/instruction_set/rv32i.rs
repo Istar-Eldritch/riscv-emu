@@ -177,97 +177,90 @@ fn ebreak(
 
 /// Load Upper Immediate
 fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = sext(parsed.imm << 12, 32, 32);
+    cpu.set_x(parsed.rd, sext(parsed.imm << 12, 32, 32));
     Ok(1)
 }
 
 /// Add Upper Immediate to PC
 fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.pc + sext(parsed.imm << 12, 32, 32);
+    cpu.set_x(parsed.rd, cpu.pc + sext(parsed.imm << 12, 32, 32));
     Ok(1)
 }
 
 /// Jump and Link
 fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.pc + 4;
-    cpu.pc += sext(
-        parsed.imm0 << 11 | parsed.imm1 << 10 | parsed.imm2 | parsed.imm3 << 19,
-        20,
-        32,
-    );
+    cpu.set_x(parsed.rd, cpu.pc);
+    let offset =
+        (parsed.imm0 << 12) | (parsed.imm1 << 11) | (parsed.imm2 << 1) | (parsed.imm3 << 20);
+    cpu.pc = (cpu.pc as i32 + (sext(offset, 20, 32) as i32).wrapping_sub(4)) as u32;
     Ok(1)
 }
 
 /// Jump and Link Register
 fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = if parsed.rd == 0 { 1 } else { parsed.rd };
-    cpu.x[addr as usize] = cpu.pc + 4;
-    cpu.pc = (cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32)) & !1;
+    let rd = if parsed.rd == 0 { 1 } else { parsed.rd };
+    let t = cpu.get_x(parsed.rs1);
+    cpu.set_x(rd, cpu.pc);
+    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
     Ok(1)
 }
 
 fn beq(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.x[parsed.rs1 as usize] == cpu.x[parsed.rs2 as usize] {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if cpu.get_x(parsed.rs1) == cpu.get_x(parsed.rs2) {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
 
 fn bge(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.x[parsed.rs1 as usize] as i32 >= cpu.x[parsed.rs2 as usize] as i32 {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if cpu.get_x(parsed.rs1) as i32 >= cpu.get_x(parsed.rs2) as i32 {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
 
 fn bgeu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.x[parsed.rs1 as usize] >= cpu.x[parsed.rs2 as usize] {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if cpu.get_x(parsed.rs1) >= cpu.get_x(parsed.rs2) {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
 
 fn blt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if (cpu.x[parsed.rs1 as usize] as i32) < cpu.x[parsed.rs2 as usize] as i32 {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if (cpu.get_x(parsed.rs1) as i32) < (cpu.get_x(parsed.rs2) as i32) {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
 
 fn bltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.x[parsed.rs1 as usize] < cpu.x[parsed.rs2 as usize] {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if cpu.get_x(parsed.rs1) < cpu.get_x(parsed.rs2) {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
 
 fn bne(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.x[parsed.rs1 as usize] != cpu.x[parsed.rs2 as usize] {
-        cpu.pc += sext(
-            parsed.imm0 << 10 | parsed.imm1 | parsed.imm2 << 4 | parsed.imm3 << 11,
-            12,
-            32,
-        );
+    if cpu.get_x(parsed.rs1) != cpu.get_x(parsed.rs2) {
+        let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
+        cpu.pc = (cpu.pc as i32)
+            .wrapping_add(sext(offset, 12, 32) as i32)
+            .wrapping_sub(4) as u32;
     }
     Ok(1)
 }
@@ -288,47 +281,62 @@ fn branch(word: u32) -> Result<RV32i, ()> {
 }
 
 fn lb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
     let byte = mem.rb(addr).map_err(|_| Exception(LoadAccessFault))?;
-    cpu.x[parsed.rd as usize] = sext(byte as u32, 8, 32);
+    cpu.set_x(parsed.rd, sext(byte as u32, 8, 32));
     Ok(1)
 }
 
 fn lbu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rb(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    cpu.set_x(
+        parsed.rd,
+        mem.rb(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+    );
     Ok(1)
 }
 
 fn lh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(
-        mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
-        16,
-        32,
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    cpu.set_x(
+        parsed.rd,
+        sext(
+            mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+            16,
+            32,
+        ),
     );
     Ok(1)
 }
 
 fn lhu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    cpu.set_x(
+        parsed.rd,
+        mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+    );
     Ok(1)
 }
 
 fn lw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = sext(
-        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
-        32,
-        32,
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    cpu.set_x(
+        parsed.rd,
+        sext(
+            mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+            32,
+            32,
+        ),
     );
     Ok(1)
 }
 
 fn lwu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm, 12, 32);
-    cpu.x[parsed.rd as usize] = mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32;
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    cpu.set_x(
+        parsed.rd,
+        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+    );
     Ok(1)
 }
 
@@ -347,22 +355,25 @@ fn load(word: u32) -> Result<RV32i, ()> {
 }
 
 fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.wb(addr, cpu.x[parsed.rs2 as usize] as u8)
+    let addr = (cpu.get_x(parsed.rs1) as i32)
+        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    mem.wb(addr, cpu.get_x(parsed.rs2) as u8)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    mem.whw(addr, cpu.x[parsed.rs2 as usize] as u16)
+    let addr = (cpu.get_x(parsed.rs1) as i32)
+        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    mem.whw(addr, cpu.get_x(parsed.rs2) as u16)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = cpu.x[parsed.rs1 as usize] + sext(parsed.imm0 | parsed.imm1, 12, 32);
-    let value = cpu.x[parsed.rs2 as usize];
+    let addr = (cpu.get_x(parsed.rs1) as i32)
+        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    let value = cpu.get_x(parsed.rs2);
     mem.ww(addr, value)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
@@ -380,18 +391,21 @@ fn store(word: u32) -> Result<RV32i, ()> {
 }
 
 fn addi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(sext(parsed.imm, 12, 32));
+    cpu.set_x(
+        parsed.rd,
+        (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32,
+    );
     Ok(1)
 }
 
 fn slti(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if (cpu.x[parsed.rs1 as usize] as i32) < sext(parsed.imm, 12, 32) as i32 {
+    let v = if (cpu.get_x(parsed.rs1) as i32) < sext(parsed.imm, 12, 32) as i32 {
         1
     } else {
         0
     };
 
-    cpu.x[parsed.rd as usize] = v;
+    cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
@@ -400,53 +414,62 @@ fn sltiu(
     __mem: &mut dyn Memory,
     parsed: IFormat,
 ) -> Result<u32, ExceptionInterrupt> {
-    let v = if cpu.x[parsed.rs1 as usize] < sext(parsed.imm, 12, 32) {
+    let v = if cpu.get_x(parsed.rs1) < sext(parsed.imm, 12, 32) {
         1
     } else {
         0
     };
 
-    cpu.x[parsed.rd as usize] = v;
+    cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
 fn xori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] =
-        cpu.x[parsed.rs1 as usize] ^ sext(cpu.x[parsed.imm as usize], 12, 32);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1) ^ sext(cpu.get_x(parsed.imm), 12, 32),
+    );
     Ok(1)
 }
 
 fn ori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] =
-        cpu.x[parsed.rs1 as usize] | sext(cpu.x[parsed.imm as usize], 12, 32);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1) | sext(cpu.get_x(parsed.imm), 12, 32),
+    );
     Ok(1)
 }
 
 fn andi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] =
-        cpu.x[parsed.rs1 as usize] & sext(cpu.x[parsed.imm as usize], 12, 32);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1) & sext(cpu.get_x(parsed.imm), 12, 32),
+    );
     Ok(1)
 }
 
 fn slli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shl(shamt);
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1).wrapping_shl(shamt));
     Ok(1)
 }
 
 fn srli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_shr(shamt);
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1).wrapping_shr(shamt));
     Ok(1)
 }
 
 fn srai(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
-    let rs1 = cpu.x[parsed.rs1 as usize];
-    // TODO: shamt[5] should be 0, otherwise is an illegal instruction
-    cpu.x[parsed.rd as usize] = (rs1 as i32).wrapping_shr(shamt) as u32;
+    if shamt & 0b100000 != 0 {
+        return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
+    }
+
+    let rs1 = cpu.get_x(parsed.rs1);
+    cpu.set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
     Ok(1)
 }
 
@@ -468,68 +491,80 @@ fn immediate(word: u32) -> Result<RV32i, ()> {
 }
 
 fn add(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_add(cpu.x[parsed.rs2 as usize]);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1).wrapping_add(cpu.get_x(parsed.rs2)),
+    );
     Ok(1)
 }
 
 fn sub(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize].wrapping_sub(cpu.x[parsed.rs2 as usize]);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1).wrapping_sub(cpu.get_x(parsed.rs2)),
+    );
     Ok(1)
 }
 
 fn sll(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] =
-        cpu.x[parsed.rs1 as usize].wrapping_shl(cpu.x[parsed.rs2 as usize] & 0b11111);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1)
+            .wrapping_shl(cpu.get_x(parsed.rs2) & 0b11111),
+    );
     Ok(1)
 }
 
 fn slt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if (cpu.x[parsed.rs1 as usize] as i32) < cpu.x[parsed.rs2 as usize] as i32 {
+    let v = if (cpu.get_x(parsed.rs1) as i32) < cpu.get_x(parsed.rs2) as i32 {
         1
     } else {
         0
     };
 
-    cpu.x[parsed.rd as usize] = v;
+    cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
 fn sltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if cpu.x[parsed.rs1 as usize] < cpu.x[parsed.rs2 as usize] {
+    let v = if cpu.get_x(parsed.rs1) < cpu.get_x(parsed.rs2) {
         1
     } else {
         0
     };
 
-    cpu.x[parsed.rd as usize] = v;
+    cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
 fn xor(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] ^ cpu.x[parsed.rs2 as usize];
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) ^ cpu.get_x(parsed.rs2));
     Ok(1)
 }
 
 fn srl(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] =
-        cpu.x[parsed.rs1 as usize].wrapping_shr(cpu.x[parsed.rs2 as usize] & 0b11111);
+    cpu.set_x(
+        parsed.rd,
+        cpu.get_x(parsed.rs1)
+            .wrapping_shr(cpu.get_x(parsed.rs2) & 0b11111),
+    );
     Ok(1)
 }
 
 fn sra(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let shamt = cpu.x[parsed.rs2 as usize] & 0b11111;
-    let rs1 = cpu.x[parsed.rs1 as usize];
-    cpu.x[parsed.rd as usize] = (rs1 as i32).wrapping_shr(shamt) as u32;
+    let shamt = cpu.get_x(parsed.rs2) & 0b11111;
+    let rs1 = cpu.get_x(parsed.rs1);
+    cpu.set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
     Ok(1)
 }
 
 fn or(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] | cpu.x[parsed.rs2 as usize];
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) | cpu.get_x(parsed.rs2));
     Ok(1)
 }
 
 fn and(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = cpu.x[parsed.rs1 as usize] & cpu.x[parsed.rs2 as usize];
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) & cpu.get_x(parsed.rs2));
     Ok(1)
 }
 
@@ -574,11 +609,11 @@ fn csrrw(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, E
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize]) {
+    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1)) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.x[parsed.rd as usize] = t as u32;
+    cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
@@ -587,11 +622,11 @@ fn csrrs(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, E
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] | t) {
+    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1) | t) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.x[parsed.rd as usize] = t as u32;
+    cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
@@ -600,11 +635,11 @@ fn csrrc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, E
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, t & !cpu.x[parsed.rs1 as usize]) {
+    match cpu.set_csr(parsed.imm, t & !cpu.get_x(parsed.rs1)) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.x[parsed.rd as usize] = t as u32;
+    cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
@@ -613,11 +648,14 @@ fn csrrwi(
     _mem: &mut dyn Memory,
     parsed: IFormat,
 ) -> Result<u32, ExceptionInterrupt> {
-    cpu.x[parsed.rd as usize] = match cpu.get_csr(parsed.imm) {
-        Ok(v) => v,
-        Err(err) => return Err(ExceptionInterrupt::Exception(err)),
-    };
-    match cpu.set_csr(parsed.imm, cpu.x[parsed.rs1 as usize] & 0b11111) {
+    cpu.set_x(
+        parsed.rd,
+        match cpu.get_csr(parsed.imm) {
+            Ok(v) => v,
+            Err(err) => return Err(ExceptionInterrupt::Exception(err)),
+        },
+    );
+    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1) & 0b11111) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => (),
     };
@@ -635,14 +673,14 @@ fn csrrsi(
             return Err(ExceptionInterrupt::Exception(err));
         }
     };
-    let new_value = cpu.x[parsed.rs1 as usize] | t;
+    let new_value = cpu.get_x(parsed.rs1) | t;
     match cpu.set_csr(parsed.imm, new_value) {
         Err(err) => {
             return Err(ExceptionInterrupt::Exception(err));
         }
         _ => {}
     };
-    cpu.x[parsed.rd as usize] = t as u32;
+    cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
@@ -655,11 +693,11 @@ fn csrrci(
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, t & !(cpu.x[parsed.rs1 as usize] & 0b11111)) {
+    match cpu.set_csr(parsed.imm, t & !(cpu.get_x(parsed.rs1) & 0b11111)) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.x[parsed.rd as usize] = t as u32;
+    cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
@@ -693,7 +731,7 @@ mod tests {
         // lui x1, 0x23
         let lui = LUI(UFormat { rd: 1, imm: 23 });
         lui.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.x[1], 23 << 12);
+        assert_eq!(cpu.get_x(1), 23 << 12);
     }
 
     #[test]
@@ -703,7 +741,7 @@ mod tests {
         cpu.pc = 10;
         let inst = AUIPC(UFormat { rd: 1, imm: 23 });
         inst.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.x[1], (23 << 12) + 10);
+        assert_eq!(cpu.get_x(1), (23 << 12) + 10);
     }
 
     #[test]
@@ -720,7 +758,7 @@ mod tests {
         });
 
         inst.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.x[1], 10 + 4);
+        assert_eq!(cpu.get_x(1), 10 + 4);
         assert_eq!(cpu.pc, 10 + 23);
     }
 
@@ -729,7 +767,7 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[2] = 3;
+        cpu.set_x(2, 3);
         let inst = JALR(IFormat {
             op: 0b1100111,
             rd: 1,
@@ -740,7 +778,7 @@ mod tests {
 
         inst.execute(&mut cpu, &mut mem).unwrap();
 
-        assert_eq!(cpu.x[1], 10 + 4);
+        assert_eq!(cpu.get_x(1), 10 + 4);
         assert_eq!(cpu.pc, 3 + 23);
     }
 
@@ -749,8 +787,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 1);
         let inst = BEQ(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -772,8 +810,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 2;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 2);
         let inst = BEQ(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -795,8 +833,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 1);
         let inst = BNE(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -818,8 +856,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 2;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 2);
         let inst = BNE(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -841,8 +879,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 1);
         let inst = BLT(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -864,8 +902,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 2;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 2);
         let inst = BLT(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -887,8 +925,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 0;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 0);
+        cpu.set_x(2, 1);
         let inst = BGE(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -910,8 +948,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 1;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 1);
+        cpu.set_x(2, 1);
         let inst = BGE(BFormat {
             op: 0b1100011,
             funct3: 0,
@@ -933,8 +971,8 @@ mod tests {
         let mut cpu = CPU::new();
         let mut mem = GenericMemory::new(1024 * 100);
         cpu.pc = 10;
-        cpu.x[1] = 2;
-        cpu.x[2] = 1;
+        cpu.set_x(1, 2);
+        cpu.set_x(2, 1);
         let inst = BGE(BFormat {
             op: 0b1100011,
             funct3: 0,

@@ -41,7 +41,7 @@ impl MMU {
             v if v <= 0x0003_2000 => Ok(Box::new(&mut self.flash)), //
             v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&mut self.clint)),
             v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&mut self.plic)),
-            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(Box::new(&mut self.uart0)),
+            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(Box::new(&mut self.uart0)),
             _ => Err(MemoryError::AccessFault),
         }
     }
@@ -51,7 +51,7 @@ impl MMU {
             v if v <= 0x0003_2000 => Ok(Box::new(&self.flash)), //
             v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&self.clint)),
             v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&self.plic)),
-            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(Box::new(&self.uart0)),
+            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(Box::new(&self.uart0)),
             _ => Err(MemoryError::AccessFault),
         }
     }
@@ -61,7 +61,7 @@ impl MMU {
             v if v <= 0x32000 => Ok(addr), //
             v if v >= 0x200_0000 && v < 0x200_FFFF => Ok(addr - 0x200_0000),
             v if v >= 0xC00_0000 && v < 0x1000_0000 => Ok(addr - 0xC00_0000),
-            v if v >= 0x1001_0000 && v < 0x1001_3FFF => Ok(addr - 0x1001_0000),
+            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(addr - 0x1001_3000),
             _ => Err(MemoryError::AccessFault),
         }
     }

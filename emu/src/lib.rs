@@ -90,7 +90,7 @@ impl Emulator {
             log::debug!("instruction: {:?}", v);
             v.execute(&mut self.cpu, self.mem.as_mut_mem())?
         } else {
-            log::debug!("error decoding instruction: {word}");
+            log::error!("error decoding instruction: {word:b}");
             return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
         };
 
@@ -196,7 +196,10 @@ impl Emulator {
         } else if let Ok(0) = word {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else if let Ok(addr) = word {
-            log::debug!("executing - mstatus: {mstatus:b}, pc: {pc:x}");
+            log::debug!(
+                "executing - mstatus: {mstatus:b}, pc: {pc:x}, x1: {:x}",
+                self.cpu.get_x(1)
+            );
             match self.run_instruction(addr) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),
@@ -211,7 +214,6 @@ impl Emulator {
     // Handles interrupts and exceptions
     fn handle_exception(&mut self, exc: ExceptionInterrupt) -> TickResult {
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
-
         let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
@@ -242,7 +244,7 @@ impl Emulator {
             }
             ExceptionInterrupt::Exception(e) => {
                 match e {
-                    Exception::MEnvironmentCall if self.cpu.x[15] == 255 => {
+                    Exception::MEnvironmentCall if self.cpu.get_x(15) == 255 => {
                         return TickResult::HALT
                     }
                     _ => {
@@ -289,8 +291,8 @@ impl Emulator {
     pub fn dump(&self) -> Vec<u8> {
         use std::mem::transmute;
         let mut dump: Vec<u8> = Vec::new();
-        for w in 0..self.cpu.x.len() {
-            let bytes: [u8; 4] = unsafe { transmute(self.cpu.x[w]) };
+        for w in 0..32 {
+            let bytes: [u8; 4] = unsafe { transmute(self.cpu.get_x(w)) };
             for b in bytes {
                 dump.push(b);
             }
@@ -331,7 +333,7 @@ pub struct CPU {
     // program counter
     pub pc: u32,
     // x regisers, ignoring x0
-    pub x: [u32; 32],
+    x: [u32; 32],
     // waiting for interrupt
     pub wfi: bool,
     // csr registers
@@ -389,6 +391,16 @@ impl CPU {
         let idx = Self::csr_idx_map(addr)?;
         self.csr[idx] = v;
         Ok(())
+    }
+
+    pub fn get_x(&self, idx: u32) -> u32 {
+        self.x[idx as usize]
+    }
+
+    pub fn set_x(&mut self, idx: u32, val: u32) {
+        if idx > 0 {
+            self.x[idx as usize] = val;
+        }
     }
 }
 

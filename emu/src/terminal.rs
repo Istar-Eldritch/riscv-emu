@@ -1,6 +1,6 @@
 use crate::memory::uart::UARTDevice;
 use std::collections::VecDeque;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
@@ -48,6 +48,7 @@ impl UARTDevice for TermEmulator {
     }
 
     fn write(&mut self, v: u8) {
-        print!("{}", v as char)
+        print!("{}", v as char);
+        std::io::stdout().flush().unwrap();
     }
 }
