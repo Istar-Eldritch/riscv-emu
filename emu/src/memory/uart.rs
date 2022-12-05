@@ -43,9 +43,7 @@ impl UART {
     }
 
     fn write(&mut self, v: u8) -> () {
-        if self.t_fifo.len() < 8 {
-            self.t_fifo.push_front(v)
-        }
+        self.t_fifo.push_front(v)
     }
 }
 
@@ -56,9 +54,7 @@ impl Clocked<()> for UART {
             // rxen = 1
             if self.rxctrl & 0b1 != 0 {
                 if let Some(b) = device.read() {
-                    if r_fifo.len() < 8 {
-                        r_fifo.push_front(b);
-                    }
+                    r_fifo.push_front(b);
                 }
             }
 
