@@ -425,26 +425,17 @@ fn sltiu(
 }
 
 fn xori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
-        parsed.rd,
-        cpu.get_x(parsed.rs1) ^ sext(cpu.get_x(parsed.imm), 12, 32),
-    );
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) ^ sext(parsed.imm, 12, 32));
     Ok(1)
 }
 
 fn ori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
-        parsed.rd,
-        cpu.get_x(parsed.rs1) | sext(cpu.get_x(parsed.imm), 12, 32),
-    );
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) | sext(parsed.imm, 12, 32));
     Ok(1)
 }
 
 fn andi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
-        parsed.rd,
-        cpu.get_x(parsed.rs1) & sext(cpu.get_x(parsed.imm), 12, 32),
-    );
+    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) & sext(parsed.imm, 12, 32));
     Ok(1)
 }
 
