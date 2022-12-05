@@ -25,7 +25,7 @@ impl PLIC {
         let mut interrupts = Vec::new();
         for i in 0..52 {
             let code = 1 << i;
-            let priority = self.source_priority[code as usize];
+            let priority = self.source_priority[i as usize];
             if self.h0mie & code != 0
                 && *self.pending.borrow() & code != 0
                 && priority >= self.h0mpt

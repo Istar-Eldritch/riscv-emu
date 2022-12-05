@@ -135,8 +135,8 @@ impl Emulator {
 
     /// External interrupt pending bit check
     fn update_mip_meip(&mut self) {
-        let external_interrupts =
-            self.mem.rw(0x1000).unwrap() as u64 | ((self.mem.rw(0x1004).unwrap() as u64) << 4);
+        let external_interrupts = self.mem.rw(0x0c00_1000).unwrap() as u64
+            | ((self.mem.rw(0x0c00_1004).unwrap() as u64) << 4);
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_mei = if external_interrupts != 0 {
             mip | (1 << Interrupt::MExternalInterrupt as u32)
@@ -228,9 +228,9 @@ impl Emulator {
                     if i == Interrupt::MExternalInterrupt {
                         // XXX: For external interrupts, this implementation resets the PLIC pending
                         // bit, and sets the interrupt value to mtval which may not be the correct vehaviour.
-                        let plic_int = self.mem.rw(0x20_0004).unwrap();
+                        let plic_int = self.mem.rw(0x0c20_0004).unwrap();
                         self.cpu.set_csr(CSRs::mtval as u32, plic_int).unwrap();
-                        self.mem.ww(0x20_0004, plic_int).unwrap();
+                        self.mem.ww(0x0c20_0004, plic_int).unwrap();
                     }
                     // XXX: This implementation reset the pending interrupt bit before the handler
                     // executes it, I'm not sure this is the correct behaviour
