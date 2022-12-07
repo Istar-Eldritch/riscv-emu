@@ -84,10 +84,10 @@ impl Emulator {
 
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
-            log::debug!("instruction: {:?}", v);
+            log::trace!("instruction: {:?}", v);
             v.execute(&mut self.cpu, self.mem.as_mut_mem())?
         } else if let Ok(v) = RV32i::try_from(word) {
-            log::debug!("instruction: {:?}", v);
+            log::trace!("instruction: {:?}", v);
             v.execute(&mut self.cpu, self.mem.as_mut_mem())?
         } else {
             log::error!("error decoding instruction: {word:b}");
@@ -189,17 +189,18 @@ impl Emulator {
         }
 
         if let Some(exc) = interrupt {
-            log::debug!("interrupt - mstatus: {mstatus}, exc: {exc:?}, pc: {pc:x}");
+            log::trace!("interrupt - mstatus: {mstatus}, exc: {exc:?}, pc: {pc:x}");
             self.handle_exception(ExceptionInterrupt::Interrupt(exc))
         } else if self.cpu.wfi {
             TickResult::WFI
         } else if let Ok(0) = word {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else if let Ok(addr) = word {
-            log::debug!(
-                "executing - mstatus: {mstatus:b}, pc: {pc:x}, x1: {:x}",
-                self.cpu.get_x(1)
-            );
+            if log::log_enabled!(log::Level::Trace) {
+                let csrs = self.cpu.csr.map(|c| format!("{c:b}"));
+                let x = self.cpu.x.map(|x| format!("{x:x}"));
+                log::trace!("executing - : csr: {csrs:?}, pc: {pc:x}, x: {x:?}");
+            }
             match self.run_instruction(addr) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),
@@ -213,6 +214,7 @@ impl Emulator {
 
     // Handles interrupts and exceptions
     fn handle_exception(&mut self, exc: ExceptionInterrupt) -> TickResult {
+        log::debug!("excp: {:?}", exc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
         let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
@@ -278,7 +280,7 @@ impl Emulator {
             } else {
                 match self.tick() {
                     TickResult::Cycles(v) => {
-                        log::debug!("cycle: {cycles}");
+                        log::trace!("cycle: {cycles}");
                         pending_work += v
                     }
                     TickResult::WFI => pending_work += 1, // TODO: This should actually block on a callback  instead of doing polling
@@ -291,27 +293,30 @@ impl Emulator {
     pub fn dump(&self) -> Vec<u8> {
         use std::mem::transmute;
         let mut dump: Vec<u8> = Vec::new();
+
+        // 0x0 Registers
         for w in 0..32 {
             let bytes: [u8; 4] = unsafe { transmute(self.cpu.get_x(w)) };
             for b in bytes {
                 dump.push(b);
             }
         }
-        dump.push(255);
-        dump.push(255);
-        dump.push(255);
-        dump.push(255);
+
+        // 0x80 CSRs
+
+        for i in 0..8 {
+            let bytes: [u8; 4] = unsafe { transmute(self.cpu.csr[i]) };
+            dump.append(&mut Vec::from(bytes));
+        }
+
+        // 0x80 main memory
 
         for idx in 0..0x32000 {
             dump.push(self.mem.rb(idx).unwrap());
         }
 
-        dump.push(255);
-        dump.push(255);
-        dump.push(255);
-        dump.push(255);
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_0000).unwrap()) };
+        // 0x32080 CLINT
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x0200_0000).unwrap()) };
 
         dump.append(&mut Vec::from(bytes));
 
@@ -324,6 +329,35 @@ impl Emulator {
         dump.append(&mut Vec::from(bytes));
         let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bffc).unwrap()) };
         dump.append(&mut Vec::from(bytes));
+
+        // 0x32094 PLIC
+        let plic_base = 0x0C00_0000;
+        for i in 0..52 {
+            let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + i + 4).unwrap()) };
+            dump.append(&mut Vec::from(bytes));
+        }
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x1000).unwrap()) };
+        dump.append(&mut Vec::from(bytes));
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x1004).unwrap()) };
+        dump.append(&mut Vec::from(bytes));
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x2000).unwrap()) };
+        dump.append(&mut Vec::from(bytes));
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x2004).unwrap()) };
+        dump.append(&mut Vec::from(bytes));
+
+        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x20_0000).unwrap()) };
+        dump.append(&mut Vec::from(bytes));
+
+        // 0x32178 UART0
+        let uart0_base = 0x1001_3000;
+
+        for i in 0..7 {
+            let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(uart0_base + i * 4).unwrap()) };
+            dump.append(&mut Vec::from(bytes));
+        }
 
         dump
     }
