@@ -201,7 +201,8 @@ fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, Ex
     let rd = if parsed.rd == 0 { 1 } else { parsed.rd };
     let t = cpu.get_x(parsed.rs1);
     cpu.set_x(rd, cpu.pc);
-    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
+    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32))
+        .wrapping_sub(4) as u32;
     Ok(1)
 }
 
