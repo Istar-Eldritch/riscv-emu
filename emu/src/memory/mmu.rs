@@ -30,7 +30,7 @@ impl ClockedMemory for MMU {
 impl MMU {
     pub fn new(terminal: Option<Box<dyn UARTDevice>>) -> Self {
         Self {
-            flash: GenericMemory::new(0x32000),
+            flash: GenericMemory::new(0x3_2000),
             clint: CLINT::new(),
             plic: PLIC::new(),
             uart0: UART::new(terminal),
@@ -58,9 +58,9 @@ impl MMU {
 
     fn translate_address(addr: u32) -> Result<u32, MemoryError> {
         match addr {
-            v if v <= 0x32000 => Ok(addr), //
-            v if v >= 0x200_0000 && v < 0x200_FFFF => Ok(addr - 0x200_0000),
-            v if v >= 0xC00_0000 && v < 0x1000_0000 => Ok(addr - 0xC00_0000),
+            v if v <= 0x0003_2000 => Ok(addr), //
+            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Ok(addr - 0x200_0000),
+            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(addr - 0xC00_0000),
             v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(addr - 0x1001_3000),
             _ => Err(MemoryError::AccessFault),
         }
