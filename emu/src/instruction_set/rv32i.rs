@@ -189,7 +189,7 @@ fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, E
 
 /// Jump and Link
 fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.pc);
+    cpu.set_x(parsed.rd, cpu.pc + 4);
     let offset =
         (parsed.imm0 << 12) | (parsed.imm1 << 11) | (parsed.imm2 << 1) | (parsed.imm3 << 20);
     cpu.pc = (cpu.pc as i32 + (sext(offset, 20, 32) as i32).wrapping_sub(4)) as u32;
@@ -198,9 +198,8 @@ fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, Exc
 
 /// Jump and Link Register
 fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let rd = if parsed.rd == 0 { 1 } else { parsed.rd };
     let t = cpu.get_x(parsed.rs1);
-    cpu.set_x(rd, cpu.pc);
+    cpu.set_x(parsed.rd, cpu.pc + 4);
     cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32))
         .wrapping_sub(4) as u32;
     Ok(1)
