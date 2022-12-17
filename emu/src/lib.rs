@@ -214,7 +214,7 @@ impl Emulator {
 
     // Handles interrupts and exceptions
     fn handle_exception(&mut self, exc: ExceptionInterrupt) -> TickResult {
-        log::debug!("excp: {:?}", exc);
+        log::trace!("excp: {:?}", exc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
         let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
