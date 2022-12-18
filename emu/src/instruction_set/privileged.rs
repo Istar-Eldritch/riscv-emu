@@ -34,10 +34,18 @@ impl Instruction for RVPrivileged {
             WFI(f) => wfi(cpu, f),
         }
     }
+
+    fn update_pc(&self, cpu: &mut CPU) {
+        use RVPrivileged::*;
+        match self {
+            MRET(_) => (),
+            WFI(_) => cpu.pc = cpu.pc + 4,
+        }
+    }
 }
 
 fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.pc = cpu.get_csr(CSRs::mepc as u32).unwrap() - 4;
+    cpu.pc = cpu.get_csr(CSRs::mepc as u32).unwrap();
     // TODO Set MPP privilege mode.
     let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
     let mstatus = mstatus | ((mstatus & (1 << 7)) >> 4); // recover mie from mpie

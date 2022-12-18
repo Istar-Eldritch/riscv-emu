@@ -85,16 +85,19 @@ impl Emulator {
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            v.execute(&mut self.cpu, self.mem.as_mut_mem())?
+            let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
+            v.update_pc(&mut self.cpu);
+            cost
         } else if let Ok(v) = RV32i::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            v.execute(&mut self.cpu, self.mem.as_mut_mem())?
+            let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
+            v.update_pc(&mut self.cpu);
+            cost
         } else {
             log::error!("error decoding instruction: {word:b}");
             return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
         };
 
-        self.cpu.pc += 4;
         Ok(v)
     }
 

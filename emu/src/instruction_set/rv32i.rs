@@ -134,6 +134,21 @@ impl Instruction for RV32i {
             CSRRCI(f) => csrrci(cpu, mem, f),
         }
     }
+
+    fn update_pc(&self, cpu: &mut CPU) {
+        use RV32i::*;
+        match *self {
+            JAL(_) => (),
+            JALR(_) => (),
+            BEQ(_) => (),
+            BNE(_) => (),
+            BLT(_) => (),
+            BGE(_) => (),
+            BLTU(_) => (),
+            BGEU(_) => (),
+            _ => cpu.pc += 4,
+        }
+    }
 }
 
 impl TryFrom<u32> for RV32i {
@@ -192,7 +207,7 @@ fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, Exc
     cpu.set_x(parsed.rd, cpu.pc + 4);
     let offset =
         (parsed.imm0 << 12) | (parsed.imm1 << 11) | (parsed.imm2 << 1) | (parsed.imm3 << 20);
-    cpu.pc = (cpu.pc as i32 + (sext(offset, 20, 32) as i32).wrapping_sub(4)) as u32;
+    cpu.pc = (cpu.pc as i32 + (sext(offset, 20, 32) as i32)) as u32;
     Ok(1)
 }
 
@@ -200,17 +215,16 @@ fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, Exc
 fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let t = cpu.get_x(parsed.rs1);
     cpu.set_x(parsed.rd, cpu.pc + 4);
-    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32))
-        .wrapping_sub(4) as u32;
+    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
     Ok(1)
 }
 
 fn beq(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if cpu.get_x(parsed.rs1) == cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
@@ -218,9 +232,9 @@ fn beq(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Exc
 fn bge(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if cpu.get_x(parsed.rs1) as i32 >= cpu.get_x(parsed.rs2) as i32 {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
@@ -228,9 +242,9 @@ fn bge(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Exc
 fn bgeu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if cpu.get_x(parsed.rs1) >= cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
@@ -238,9 +252,9 @@ fn bgeu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Ex
 fn blt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if (cpu.get_x(parsed.rs1) as i32) < (cpu.get_x(parsed.rs2) as i32) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
@@ -248,9 +262,9 @@ fn blt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Exc
 fn bltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if cpu.get_x(parsed.rs1) < cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
@@ -258,9 +272,9 @@ fn bltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Ex
 fn bne(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
     if cpu.get_x(parsed.rs1) != cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32)
-            .wrapping_add(sext(offset, 12, 32) as i32)
-            .wrapping_sub(4) as u32;
+        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    } else {
+        cpu.pc += 4;
     }
     Ok(1)
 }
