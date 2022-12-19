@@ -198,7 +198,10 @@ fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, Exc
 
 /// Add Upper Immediate to PC
 fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.pc + sext(parsed.imm << 12, 32, 32));
+    cpu.set_x(
+        parsed.rd,
+        ((cpu.pc as i32) + (sext(parsed.imm << 12, 32, 32)) as i32) as u32,
+    );
     Ok(1)
 }
 
@@ -215,7 +218,7 @@ fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, Exc
 fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let t = cpu.get_x(parsed.rs1);
     cpu.set_x(parsed.rd, cpu.pc + 4);
-    cpu.pc = (((t as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
+    cpu.pc = (((t as i32) + (sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
     Ok(1)
 }
 
@@ -333,14 +336,10 @@ fn lhu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, Exce
 }
 
 fn lw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    let addr = ((cpu.get_x(parsed.rs1) as i32) + (sext(parsed.imm, 12, 32) as i32)) as u32;
     cpu.set_x(
         parsed.rd,
-        sext(
-            mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
-            32,
-            32,
-        ),
+        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))?,
     );
     Ok(1)
 }
@@ -369,24 +368,24 @@ fn load(word: u32) -> Result<RV32i, ()> {
 }
 
 fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32)
-        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    let offset = parsed.imm0 | (parsed.imm1 << 5);
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     mem.wb(addr, cpu.get_x(parsed.rs2) as u8)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32)
-        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    let offset = parsed.imm0 | (parsed.imm1 << 5);
+    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     mem.whw(addr, cpu.get_x(parsed.rs2) as u16)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
 fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32)
-        .wrapping_add(sext(parsed.imm0 | parsed.imm1, 12, 32) as i32) as u32;
+    let offset = parsed.imm0 | (parsed.imm1 << 5);
+    let addr = ((cpu.get_x(parsed.rs1) as i32) + (sext(offset, 12, 32) as i32)) as u32;
     let value = cpu.get_x(parsed.rs2);
     mem.ww(addr, value)
         .map_err(|_| Exception(StoreAccessFault))?;
