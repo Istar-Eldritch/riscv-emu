@@ -138,6 +138,7 @@ impl From<BFormat> for u32 {
 
 #[derive(Debug, Clone, Copy)]
 pub struct UFormat {
+    pub op: u32,
     pub rd: u32,
     pub imm: u32,
 }
@@ -145,13 +146,22 @@ pub struct UFormat {
 impl From<u32> for UFormat {
     fn from(v: u32) -> UFormat {
         UFormat {
+            op: v & OPCODE_MASK,
             rd: (v & RD_MASK) >> 7,
             imm: (v & mask!(20) << 12) >> 12,
         }
     }
 }
+
+impl From<UFormat> for u32 {
+    fn from(v: UFormat) -> u32 {
+        v.op | v.rd << 7 | v.imm << 12
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct JFormat {
+    pub op: u32,
     pub rd: u32,
     pub imm0: u32,
     pub imm1: u32,
@@ -162,6 +172,7 @@ pub struct JFormat {
 impl From<u32> for JFormat {
     fn from(v: u32) -> JFormat {
         JFormat {
+            op: v & OPCODE_MASK,
             rd: (v & RD_MASK) >> 7,
             imm0: (v & mask!(8) << 12) >> 12,
             imm1: (v & 1 << 20) >> 20,
@@ -171,27 +182,9 @@ impl From<u32> for JFormat {
     }
 }
 
-#[derive(Debug, PartialEq)]
-#[repr(u32)]
-#[allow(non_camel_case_types)]
-pub enum Opcodes {
-    add = 0b0110011,
-    addi = 0b0010011,
-    lui = 0b0110111,
-    sb = 0b0100011,
-}
-
-impl TryFrom<u32> for Opcodes {
-    type Error = ();
-    fn try_from(v: u32) -> Result<Self, Self::Error> {
-        use Opcodes::*;
-        match v {
-            v if v == add as u32 => Ok(add),
-            v if v == addi as u32 => Ok(addi),
-            v if v == lui as u32 => Ok(lui),
-            v if v == sb as u32 => Ok(sb),
-            _ => Err(()),
-        }
+impl From<JFormat> for u32 {
+    fn from(v: JFormat) -> u32 {
+        v.op | v.rd << 7 | v.imm0 << 12 | v.imm1 << 20 | v.imm2 << 21 | v.imm3 << 31
     }
 }
 

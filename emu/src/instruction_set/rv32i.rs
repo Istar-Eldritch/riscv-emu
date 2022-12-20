@@ -80,6 +80,62 @@ pub enum RV32i {
     CSRRCI(IFormat),
 }
 
+impl From<RV32i> for u32 {
+    fn from(inst: RV32i) -> u32 {
+        use RV32i::*;
+        match inst {
+            LUI(f) => f.into(),
+            AUIPC(f) => f.into(),
+            JAL(f) => f.into(),
+            JALR(f) => f.into(),
+            BEQ(f) => f.into(),
+            BNE(f) => f.into(),
+            BLT(f) => f.into(),
+            BGE(f) => f.into(),
+            BLTU(f) => f.into(),
+            BGEU(f) => f.into(),
+            LB(f) => f.into(),
+            LH(f) => f.into(),
+            LW(f) => f.into(),
+            LBU(f) => f.into(),
+            LHU(f) => f.into(),
+            LWU(f) => f.into(),
+            SB(f) => f.into(),
+            SH(f) => f.into(),
+            SW(f) => f.into(),
+            ADDI(f) => f.into(),
+            SLTI(f) => f.into(),
+            SLTIU(f) => f.into(),
+            XORI(f) => f.into(),
+            ORI(f) => f.into(),
+            ANDI(f) => f.into(),
+            SLLI(f) => f.into(),
+            SRLI(f) => f.into(),
+            SRAI(f) => f.into(),
+            ADD(f) => f.into(),
+            SUB(f) => f.into(),
+            SLL(f) => f.into(),
+            SLT(f) => f.into(),
+            SLTU(f) => f.into(),
+            XOR(f) => f.into(),
+            SRL(f) => f.into(),
+            SRA(f) => f.into(),
+            OR(f) => f.into(),
+            AND(f) => f.into(),
+            FENCE(f) => f.into(),
+            FENCEI(f) => f.into(),
+            ECALL(f) => f.into(),
+            EBREAK(f) => f.into(),
+            CSRRW(f) => f.into(),
+            CSRRS(f) => f.into(),
+            CSRRC(f) => f.into(),
+            CSRRWI(f) => f.into(),
+            CSRRSI(f) => f.into(),
+            CSRRCI(f) => f.into(),
+        }
+    }
+}
+
 impl Instruction for RV32i {
     fn execute(&self, cpu: &mut CPU, mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt> {
         use RV32i::*;

@@ -26,6 +26,16 @@ impl TryFrom<u32> for RVPrivileged {
     }
 }
 
+impl From<RVPrivileged> for u32 {
+    fn from(inst: RVPrivileged) -> u32 {
+        use RVPrivileged::*;
+        match inst {
+            MRET(i) => i.into(),
+            WFI(i) => i.into(),
+        }
+    }
+}
+
 impl Instruction for RVPrivileged {
     fn execute(&self, cpu: &mut CPU, _mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt> {
         use RVPrivileged::*;
