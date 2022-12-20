@@ -22,6 +22,14 @@ pub enum MemoryError {
     AccessFault,
 }
 
+impl std::fmt::Display for MemoryError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(formatter, "{:?}", self)
+    }
+}
+
+impl std::error::Error for MemoryError {}
+
 pub trait Memory {
     fn rb(&self, addr: u32) -> Result<u8, MemoryError>;
 

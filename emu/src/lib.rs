@@ -5,6 +5,7 @@ mod utils;
 
 use instruction_set::{privileged::RVPrivileged, rv32i::RV32i, Instruction};
 use memory::{uart::UARTDevice, ClockedMemory, Memory, MMU};
+use std::io::{BufWriter, Write};
 pub use terminal::TermEmulator;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,6 +54,8 @@ pub struct Emulator {
     cpu: CPU,
     mem: Box<dyn ClockedMemory>,
     speed: u32, // speed in hz
+    dump_path: std::path::PathBuf,
+    cycles: usize,
 }
 
 fn wait_cycles(hz: u32, cycles: u32) {
@@ -64,15 +67,24 @@ fn wait_cycles(hz: u32, cycles: u32) {
 pub enum TickResult {
     WFI,
     HALT,
+    Dump(std::ops::RangeInclusive<u32>),
     Cycles(u32),
 }
 
+pub struct EmulatorOpts {
+    pub speed: u32,
+    pub terminal: Option<Box<dyn UARTDevice>>,
+    pub dump_path: std::path::PathBuf,
+}
+
 impl Emulator {
-    pub fn new(speed: u32, terminal: Option<Box<dyn UARTDevice>>) -> Self {
+    pub fn new(opts: EmulatorOpts) -> Self {
         Emulator {
             cpu: CPU::new(),
-            mem: Box::new(MMU::new(terminal)),
-            speed,
+            mem: Box::new(MMU::new(opts.terminal)),
+            speed: opts.speed,
+            dump_path: opts.dump_path,
+            cycles: 0,
         }
     }
 
@@ -87,14 +99,16 @@ impl Emulator {
             log::trace!("instruction: {:?}", v);
             let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
             v.update_pc(&mut self.cpu);
+            self.cycles += cost as usize;
             cost
         } else if let Ok(v) = RV32i::try_from(word) {
             log::trace!("instruction: {:?}", v);
             let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
             v.update_pc(&mut self.cpu);
+            self.cycles += cost as usize;
             cost
         } else {
-            log::error!("error decoding instruction: {word:b}");
+            log::error!("error decoding instruction: {word:b} at {:x}", self.cpu.pc);
             return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
         };
 
@@ -249,8 +263,14 @@ impl Emulator {
             }
             ExceptionInterrupt::Exception(e) => {
                 match e {
-                    Exception::MEnvironmentCall if self.cpu.get_x(15) == 255 => {
+                    Exception::MEnvironmentCall if self.cpu.get_x(10) == 255 => {
                         return TickResult::HALT
+                    }
+                    Exception::MEnvironmentCall if self.cpu.get_x(10) == 254 => {
+                        let start = self.cpu.get_x(11);
+                        let end = self.cpu.get_x(12);
+                        let range = std::ops::RangeInclusive::new(start, end);
+                        return TickResult::Dump(range);
                     }
                     _ => {
                         // XXX: Exceptions add the pc to the mtval, which may not be the correct
@@ -272,97 +292,55 @@ impl Emulator {
         TickResult::Cycles(4)
     }
 
-    pub fn run_program(&mut self) -> Result<(), ExceptionInterrupt> {
-        let mut cycles = 0;
+    pub fn run_program(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut pending_work = 0;
         loop {
             if pending_work > 0 {
-                cycles += 1;
                 pending_work -= 1;
                 wait_cycles(self.speed, 1);
             } else {
                 match self.tick() {
                     TickResult::Cycles(v) => {
-                        log::trace!("cycle: {cycles}");
+                        log::trace!("cycle: {}", self.cycles);
                         pending_work += v
                     }
                     TickResult::WFI => pending_work += 1, // TODO: This should actually block on a callback  instead of doing polling
                     TickResult::HALT => return Ok(()),
+                    TickResult::Dump(range) => {
+                        self.cpu.set_x(10, 0);
+
+                        let dump_path = self.dump_path.join(format!("{}.dump", self.cycles));
+                        log::info!(
+                            "Dump from {:x} to {:x} at {}",
+                            range.start(),
+                            range.end(),
+                            dump_path.to_string_lossy().to_string()
+                        );
+
+                        let file = std::fs::File::create(&dump_path)?;
+                        let mut bw = BufWriter::new(file);
+
+                        self.dump(&mut bw, range)?;
+                    }
                 }
             }
         }
     }
 
-    pub fn dump(&self) -> Vec<u8> {
-        use std::mem::transmute;
-        let mut dump: Vec<u8> = Vec::new();
-
-        // 0x0 Registers
-        for w in 0..32 {
-            let bytes: [u8; 4] = unsafe { transmute(self.cpu.get_x(w)) };
-            for b in bytes {
-                dump.push(b);
-            }
+    /// Dumps a memory range to a file,
+    pub fn dump<W>(
+        &self,
+        writer: &mut BufWriter<W>,
+        range: std::ops::RangeInclusive<u32>,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        W: Write,
+    {
+        for addr in range {
+            let entry = self.mem.rb(addr)?;
+            writer.write(&[entry])?;
         }
-
-        // 0x80 CSRs
-
-        for i in 0..8 {
-            let bytes: [u8; 4] = unsafe { transmute(self.cpu.csr[i]) };
-            dump.append(&mut Vec::from(bytes));
-        }
-
-        // 0x80 main memory
-
-        for idx in 0..0x32000 {
-            dump.push(self.mem.rb(idx).unwrap());
-        }
-
-        // 0x32080 CLINT
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x0200_0000).unwrap()) };
-
-        dump.append(&mut Vec::from(bytes));
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4000).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_4004).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bff8).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(0x200_bffc).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        // 0x32094 PLIC
-        let plic_base = 0x0C00_0000;
-        for i in 0..52 {
-            let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + i + 4).unwrap()) };
-            dump.append(&mut Vec::from(bytes));
-        }
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x1000).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x1004).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x2000).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x2004).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(plic_base + 0x20_0000).unwrap()) };
-        dump.append(&mut Vec::from(bytes));
-
-        // 0x32178 UART0
-        let uart0_base = 0x1001_3000;
-
-        for i in 0..7 {
-            let bytes: [u8; 4] = unsafe { transmute(self.mem.rw(uart0_base + i * 4).unwrap()) };
-            dump.append(&mut Vec::from(bytes));
-        }
-
-        dump
+        Ok(())
     }
 }
 

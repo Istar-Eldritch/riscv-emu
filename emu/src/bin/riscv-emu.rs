@@ -1,7 +1,7 @@
 use clap::{command, Parser};
-use riscv_emu::{Emulator, TermEmulator};
+use riscv_emu::{Emulator, EmulatorOpts, TermEmulator};
 use std::fs;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, Read};
 
 /// A ruscv emulator
 #[derive(Parser, Debug)]
@@ -10,7 +10,7 @@ struct Args {
     /// the binary to flash
     flash: String,
     #[arg(short, long)]
-    dump: Option<String>,
+    dump_folder: Option<String>,
     #[arg(short, long)]
     speed: Option<u32>,
     #[arg(short, long)]
@@ -30,21 +30,21 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Flash memory loaded");
     let mut term = TermEmulator::new();
     term.lock();
-    let mut emu = Emulator::new(args.speed.unwrap_or(1), Some(Box::new(term)));
+    let opts = EmulatorOpts {
+        speed: args.speed.unwrap_or(1),
+        terminal: Some(Box::new(term)),
+        dump_path: std::path::PathBuf::from(
+            args.dump_folder.unwrap_or(
+                std::env::current_dir()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+        ),
+    };
+    let mut emu = Emulator::new(opts);
     emu.flash(mem);
     emu.run_program()?;
     log::info!("Program ended execution");
-    if let Some(path_str) = args.dump {
-        let path = std::path::Path::new(&path_str);
-        if path.exists() {
-            fs::remove_file(path)?;
-        }
-
-        let file = fs::File::create(path)?;
-
-        let mut bw = BufWriter::new(file);
-        bw.write_all(&emu.dump())?;
-        log::info!("Resulting machine state dumped to {path_str}");
-    }
     Ok(())
 }
