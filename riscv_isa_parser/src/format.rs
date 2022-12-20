@@ -201,10 +201,10 @@ mod tests {
 
         let parsed = RFormat::from(inst);
 
-        assert_eq!(opcode(inst), Opcodes::add as u32, "opcode");
         assert_eq!(parsed.rd, 1, "rd");
         assert_eq!(parsed.rs1, 2, "rs1");
         assert_eq!(parsed.rs2, 3, "rs2");
+        assert_eq!(inst, parsed.into());
     }
 
     #[test]
@@ -215,10 +215,10 @@ mod tests {
 
         let parsed = IFormat::from(inst);
 
-        assert_eq!(opcode(inst), Opcodes::addi as u32, "opcode");
         assert_eq!(parsed.rd, 1, "rd");
         assert_eq!(parsed.rs1, 2, "rs1");
         assert_eq!(parsed.imm, 0x80, "imm");
+        assert_eq!(inst, parsed.into());
     }
 
     #[test]
@@ -229,11 +229,11 @@ mod tests {
 
         let parsed = SFormat::from(inst);
 
-        assert_eq!(opcode(inst), Opcodes::sb as u32, "opcode");
         assert_eq!(parsed.rs1, 2, "rs1");
         assert_eq!(parsed.rs2, 1, "rs2");
         assert_eq!(parsed.imm0, 0x7, "offset");
         assert_eq!(parsed.imm1, 0, "imm");
+        assert_eq!(inst, parsed.into());
     }
 
     #[test]
@@ -251,6 +251,7 @@ mod tests {
         assert_eq!(parsed.imm3, 0, "imm3");
         assert_eq!(parsed.rs1, 5, "rs1");
         assert_eq!(parsed.rs2, 7, "rs2");
+        assert_eq!(inst, parsed.into());
     }
 
     #[test]
@@ -261,9 +262,9 @@ mod tests {
 
         let parsed = UFormat::from(inst);
 
-        assert_eq!(opcode(inst), Opcodes::lui as u32, "opcode");
         assert_eq!(parsed.rd, 1, "rd");
         assert_eq!(parsed.imm, 0x90, "imm");
+        assert_eq!(inst, parsed.into());
     }
 
     #[test]
@@ -274,11 +275,12 @@ mod tests {
 
         let parsed = JFormat::from(inst);
 
-        assert_eq!(opcode(inst), 0b1101111, "opcode");
+        assert_eq!(inst & OPCODE_MASK, 0b1101111, "opcode");
         assert_eq!(parsed.rd, 1, "rd");
         assert_eq!(parsed.imm0, 0, "imm0");
         assert_eq!(parsed.imm1, 0, "imm1");
         assert_eq!(parsed.imm2, 0, "imm2");
         assert_eq!(parsed.imm3, 0, "imm3");
+        assert_eq!(inst, parsed.into());
     }
 }

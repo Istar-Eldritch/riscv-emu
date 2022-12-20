@@ -1,5 +1,4 @@
 use crate::{ExceptionInterrupt, Memory, CPU};
-pub mod format;
 pub mod privileged;
 pub mod rv32i;
 

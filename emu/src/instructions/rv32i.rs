@@ -1,140 +1,11 @@
-use super::format::*;
 use super::Instruction;
 use crate::utils::*;
 use crate::{Exception, ExceptionInterrupt, Memory, CPU};
+use riscv_isa_parser::format::*;
+use riscv_isa_parser::rv32i::RV32i;
 
 use Exception::*;
 use ExceptionInterrupt::*;
-
-#[derive(Debug, Clone, Copy)]
-pub enum RV32i {
-    /// Load upper immediate
-    /// Writes the sign-extended 20-bit immediate, left shifted by 12bits to x[rd] zeroin the lower
-    /// 12 bit.
-    LUI(UFormat),
-    /// Add upper immediate to PC
-    /// Adds the sign-extended 20bit immediate, left-shifted 12bit, to the pc, and writes the
-    /// result to x[rd]
-    AUIPC(UFormat),
-    /// Jump and Link
-    /// Writes the address of the next instruction (pc + 4) to x[rd]. then set hte pc to the
-    /// current pc plus the sign-extended offset. If rd is omitted, x1 is used.
-    JAL(JFormat),
-    /// Jump and Link Register
-    /// Sets the pc to x[rs1] + sign-extend(offset), masking off the least significant bit of the
-    /// computed address, then writes the previous pc+4 to x[rd]. If rd is omitted, x1 is asumed;
-    JALR(IFormat),
-    /// Branch if Equal
-    /// If register x[rs1] equals register x[rs2], set the pc to the current pc plus sign-extended
-    /// offset.
-    BEQ(BFormat),
-    /// Branch if Not Equal
-    /// If register x[rs1] does not equal register x[rs2], set the pc to the current pc plus the
-    /// sign extended offset.
-    BNE(BFormat),
-    /// Branch if Less Than
-    BLT(BFormat),
-    /// Branch if Greater Than or Equal
-    BGE(BFormat),
-    /// Branch if Less Than unsigned
-    BLTU(BFormat),
-    /// Branch if Greater or Equal Unsigned
-    BGEU(BFormat),
-    LB(IFormat),
-    LH(IFormat),
-    LW(IFormat),
-    LBU(IFormat),
-    LHU(IFormat),
-    LWU(IFormat),
-    SB(SFormat),
-    SH(SFormat),
-    SW(SFormat),
-    ADDI(IFormat),
-    SLTI(IFormat),
-    SLTIU(IFormat),
-    XORI(IFormat),
-    ORI(IFormat),
-    ANDI(IFormat),
-    SLLI(IFormat),
-    SRLI(IFormat),
-    SRAI(IFormat),
-    ADD(RFormat),
-    SUB(RFormat),
-    SLL(RFormat),
-    SLT(RFormat),
-    SLTU(RFormat),
-    XOR(RFormat),
-    SRL(RFormat),
-    SRA(RFormat),
-    OR(RFormat),
-    AND(RFormat),
-    FENCE(IFormat),
-    FENCEI(IFormat),
-    ECALL(IFormat),
-    EBREAK(IFormat),
-    CSRRW(IFormat),
-    CSRRS(IFormat),
-    CSRRC(IFormat),
-    CSRRWI(IFormat),
-    CSRRSI(IFormat),
-    CSRRCI(IFormat),
-}
-
-impl From<RV32i> for u32 {
-    fn from(inst: RV32i) -> u32 {
-        use RV32i::*;
-        match inst {
-            LUI(f) => f.into(),
-            AUIPC(f) => f.into(),
-            JAL(f) => f.into(),
-            JALR(f) => f.into(),
-            BEQ(f) => f.into(),
-            BNE(f) => f.into(),
-            BLT(f) => f.into(),
-            BGE(f) => f.into(),
-            BLTU(f) => f.into(),
-            BGEU(f) => f.into(),
-            LB(f) => f.into(),
-            LH(f) => f.into(),
-            LW(f) => f.into(),
-            LBU(f) => f.into(),
-            LHU(f) => f.into(),
-            LWU(f) => f.into(),
-            SB(f) => f.into(),
-            SH(f) => f.into(),
-            SW(f) => f.into(),
-            ADDI(f) => f.into(),
-            SLTI(f) => f.into(),
-            SLTIU(f) => f.into(),
-            XORI(f) => f.into(),
-            ORI(f) => f.into(),
-            ANDI(f) => f.into(),
-            SLLI(f) => f.into(),
-            SRLI(f) => f.into(),
-            SRAI(f) => f.into(),
-            ADD(f) => f.into(),
-            SUB(f) => f.into(),
-            SLL(f) => f.into(),
-            SLT(f) => f.into(),
-            SLTU(f) => f.into(),
-            XOR(f) => f.into(),
-            SRL(f) => f.into(),
-            SRA(f) => f.into(),
-            OR(f) => f.into(),
-            AND(f) => f.into(),
-            FENCE(f) => f.into(),
-            FENCEI(f) => f.into(),
-            ECALL(f) => f.into(),
-            EBREAK(f) => f.into(),
-            CSRRW(f) => f.into(),
-            CSRRS(f) => f.into(),
-            CSRRC(f) => f.into(),
-            CSRRWI(f) => f.into(),
-            CSRRSI(f) => f.into(),
-            CSRRCI(f) => f.into(),
-        }
-    }
-}
 
 impl Instruction for RV32i {
     fn execute(&self, cpu: &mut CPU, mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt> {
@@ -203,28 +74,6 @@ impl Instruction for RV32i {
             BLTU(_) => (),
             BGEU(_) => (),
             _ => cpu.pc += 4,
-        }
-    }
-}
-
-impl TryFrom<u32> for RV32i {
-    type Error = ();
-    fn try_from(word: u32) -> Result<Self, Self::Error> {
-        use RV32i::*;
-        let opcode = opcode(word);
-        match opcode {
-            0b0110111 => Ok(LUI(UFormat::from(word))),
-            0b0010111 => Ok(AUIPC(UFormat::from(word))),
-            0b1101111 => Ok(JAL(JFormat::from(word))),
-            0b1100111 => Ok(JALR(IFormat::from(word))),
-            0b1100011 => branch(word),
-            0b0000011 => load(word),
-            0b0100011 => store(word),
-            0b0010011 => immediate(word),
-            0b0110011 => arithmetic(word),
-            0b0001111 => fences(word),
-            0b1110011 => system(word),
-            _ => Err(()),
         }
     }
 }
@@ -339,19 +188,6 @@ fn bne(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, Exc
 }
 
 /// Branch parsing
-fn branch(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = BFormat::try_from(word).unwrap();
-    match parsed.funct3 {
-        0b000 => Ok(BEQ(parsed)),
-        0b101 => Ok(BGE(parsed)),
-        0b111 => Ok(BGEU(parsed)),
-        0b100 => Ok(BLT(parsed)),
-        0b110 => Ok(BLTU(parsed)),
-        0b001 => Ok(BNE(parsed)),
-        _ => Err(()),
-    }
-}
 
 fn lb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
@@ -409,20 +245,6 @@ fn lwu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, Exce
     Ok(1)
 }
 
-fn load(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = IFormat::try_from(word).unwrap();
-    match parsed.funct3 {
-        0b000 => Ok(LB(parsed)),
-        0b100 => Ok(LBU(parsed)),
-        0b001 => Ok(LH(parsed)),
-        0b101 => Ok(LHU(parsed)),
-        0b010 => Ok(LW(parsed)),
-        0b110 => Ok(LWU(parsed)),
-        _ => Err(()),
-    }
-}
-
 fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let offset = parsed.imm0 | (parsed.imm1 << 5);
     let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
@@ -446,17 +268,6 @@ fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, Excep
     mem.ww(addr, value)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
-}
-
-fn store(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = SFormat::try_from(word).unwrap();
-    match parsed.funct3 {
-        0b000 => Ok(SB(parsed)),
-        0b001 => Ok(SH(parsed)),
-        0b010 => Ok(SW(parsed)),
-        _ => Err(()),
-    }
 }
 
 fn addi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
@@ -531,23 +342,6 @@ fn srai(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, E
     let rs1 = cpu.get_x(parsed.rs1);
     cpu.set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
     Ok(1)
-}
-
-fn immediate(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = IFormat::try_from(word).unwrap();
-    match parsed.funct3 {
-        0b000 => Ok(ADDI(parsed)),
-        0b010 => Ok(SLTI(parsed)),
-        0b011 => Ok(SLTIU(parsed)),
-        0b100 => Ok(XORI(parsed)),
-        0b110 => Ok(ORI(parsed)),
-        0b111 => Ok(ANDI(parsed)),
-        0b001 => Ok(SLLI(parsed)),
-        0b101 if parsed.imm & (0b111111 << 11) == 0 => Ok(SRLI(parsed)),
-        0b101 => Ok(SRAI(parsed)),
-        _ => Err(()),
-    }
 }
 
 fn add(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
@@ -626,34 +420,6 @@ fn or(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, Exce
 fn and(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
     cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) & cpu.get_x(parsed.rs2));
     Ok(1)
-}
-
-fn arithmetic(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = RFormat::from(word);
-    match parsed.funct3 {
-        0b000 if parsed.funct7 == 0 => Ok(ADD(parsed)),
-        0b000 => Ok(SUB(parsed)),
-        0b001 => Ok(SLL(parsed)),
-        0b010 => Ok(SLT(parsed)),
-        0b011 => Ok(SLTU(parsed)),
-        0b100 => Ok(XOR(parsed)),
-        0b101 if parsed.funct7 == 0 => Ok(SRL(parsed)),
-        0b101 => Ok(SRA(parsed)),
-        0b110 => Ok(OR(parsed)),
-        0b111 => Ok(AND(parsed)),
-        _ => Err(()),
-    }
-}
-
-fn fences(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = IFormat::from(word);
-    match parsed.funct3 {
-        0 => Ok(FENCE(parsed)),
-        1 => Ok(FENCEI(parsed)),
-        _ => Err(()),
-    }
 }
 
 fn fence(
@@ -759,293 +525,4 @@ fn csrrci(
     };
     cpu.set_x(parsed.rd, t as u32);
     Ok(1)
-}
-
-fn system(word: u32) -> Result<RV32i, ()> {
-    use RV32i::*;
-    let parsed = IFormat::from(word);
-
-    match parsed.funct3 {
-        0b000 if parsed.imm == 0 => Ok(ECALL(parsed)),
-        0b000 if parsed.imm == 1 => Ok(EBREAK(parsed)),
-        0b001 => Ok(CSRRW(parsed)),
-        0b010 => Ok(CSRRS(parsed)),
-        0b011 => Ok(CSRRC(parsed)),
-        0b101 => Ok(CSRRWI(parsed)),
-        0b110 => Ok(CSRRSI(parsed)),
-        0b111 => Ok(CSRRCI(parsed)),
-        _ => Err(()),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::RV32i::*;
-    use super::*;
-    use crate::memory::GenericMemory;
-
-    #[test]
-    fn test_lui() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        // lui x1, 0x23
-        let lui = LUI(UFormat { rd: 1, imm: 23 });
-        lui.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.get_x(1), 23 << 12);
-    }
-
-    #[test]
-    fn test_auipc() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        let inst = AUIPC(UFormat { rd: 1, imm: 23 });
-        inst.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.get_x(1), (23 << 12) + 10);
-    }
-
-    #[test]
-    fn test_jal() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        let inst = JAL(JFormat {
-            rd: 1,
-            imm0: 0,
-            imm1: 0,
-            imm2: 23,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-        assert_eq!(cpu.get_x(1), 10 + 4);
-        assert_eq!(cpu.pc, 10 + 23);
-    }
-
-    #[test]
-    fn test_jalr() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(2, 3);
-        let inst = JALR(IFormat {
-            op: 0b1100111,
-            rd: 1,
-            funct3: 0,
-            rs1: 2,
-            imm: 23,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.get_x(1), 10 + 4);
-        assert_eq!(cpu.pc, 3 + 23);
-    }
-
-    #[test]
-    fn test_beq0() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 1);
-        let inst = BEQ(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10 + 15);
-    }
-
-    #[test]
-    fn test_beq1() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 2);
-        let inst = BEQ(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10);
-    }
-
-    #[test]
-    fn test_bne0() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 1);
-        let inst = BNE(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10);
-    }
-
-    #[test]
-    fn test_bne1() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 2);
-        let inst = BNE(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10 + 15);
-    }
-
-    #[test]
-    fn test_blt0() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 1);
-        let inst = BLT(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10);
-    }
-
-    #[test]
-    fn test_blt1() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 2);
-        let inst = BLT(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10 + 15);
-    }
-
-    #[test]
-    fn test_bge0() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 0);
-        cpu.set_x(2, 1);
-        let inst = BGE(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10);
-    }
-
-    #[test]
-    fn test_bge1() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 1);
-        cpu.set_x(2, 1);
-        let inst = BGE(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10 + 15);
-    }
-
-    #[test]
-    fn test_bge2() {
-        let mut cpu = CPU::new();
-        let mut mem = GenericMemory::new(1024 * 100);
-        cpu.pc = 10;
-        cpu.set_x(1, 2);
-        cpu.set_x(2, 1);
-        let inst = BGE(BFormat {
-            op: 0b1100011,
-            funct3: 0,
-            rs1: 1,
-            rs2: 2,
-            imm0: 0,
-            imm1: 15,
-            imm2: 0,
-            imm3: 0,
-        });
-
-        inst.execute(&mut cpu, &mut mem).unwrap();
-
-        assert_eq!(cpu.pc, 10 + 15);
-    }
 }

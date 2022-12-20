@@ -1,10 +1,11 @@
-mod instruction_set;
+mod instructions;
 pub mod memory;
 mod terminal;
 mod utils;
 
-use instruction_set::{privileged::RVPrivileged, rv32i::RV32i, Instruction};
+use instructions::Instruction;
 use memory::{uart::UARTDevice, ClockedMemory, Memory, MMU};
+use riscv_isa_parser::{privileged::RVPrivileged, rv32i::RV32i};
 use std::io::{BufWriter, Write};
 pub use terminal::TermEmulator;
 

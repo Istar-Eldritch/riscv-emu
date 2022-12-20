@@ -300,6 +300,14 @@ dependencies = [
  "log",
  "macros",
  "register-interface",
+ "riscv_isa_parser",
+]
+
+[[package]]
+name = "riscv_isa_parser"
+version = "0.1.0"
+dependencies = [
+ "macros",
 ]
 
 [[package]]
