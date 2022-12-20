@@ -50,10 +50,26 @@ The current implementation doesn't support vectored trap hanlers.
 Environment Calls
 ---
 
-You can halt the execution at any time writing `255` to the `x15` register and executing `ecall`
+HALT
+------
+
+You can halt the execution at any time writing `255` to the `x10` register and executing `ecall`
 
 ```asm
-li x15, 255 // send halt signal
+li x10, 255 // send halt signal
+ecall
+```
+
+MEMDUMP
+-----
+
+You can dump a section of memory to a a writer at any time writing the `from` to `x11` the `to` to `x12` and `254` to `x10`. The default emulator will write dumps to a file and provides the argument `--dump-folder` to define the location of the dumps, if not provided it will use the current directory.
+
+```asm
+// Dumps the flash memory
+li x11, 0
+li x12, 0x0003_2000
+li x10, 254
 ecall
 ```
 
