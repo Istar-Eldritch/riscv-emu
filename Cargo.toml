@@ -2,6 +2,6 @@
 [workspace]
 members = [
   "emu",
-  "riscv_isa_parser",
+  "riscv_isa_types",
   "macros"
 ]

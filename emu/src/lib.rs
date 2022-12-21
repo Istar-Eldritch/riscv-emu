@@ -5,7 +5,7 @@ mod utils;
 
 use instructions::Instruction;
 use memory::{uart::UARTDevice, ClockedMemory, Memory, MMU};
-use riscv_isa_parser::{privileged::RVPrivileged, rv32i::RV32i};
+use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::io::{BufWriter, Write};
 pub use terminal::TermEmulator;
 

@@ -14,7 +14,7 @@ name = "riscv-emu"
 [dependencies]
 register-interface = "0.1.0"
 macros = { path = "../macros" }
-riscv_isa_parser = { path = "../riscv_isa_parser" }
+riscv_isa_types = { path = "../riscv_isa_types" }
 clap = { version = "4.0.26", features = ["derive"] }
 bincode = "1.3.3"
 log = "0.4.17"

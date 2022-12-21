@@ -1,7 +1,7 @@
 use super::Instruction;
 use crate::{CSRs, ExceptionInterrupt, Memory, CPU};
-use riscv_isa_parser::format::RFormat;
-use riscv_isa_parser::privileged::RVPrivileged;
+use riscv_isa_types::format::RFormat;
+use riscv_isa_types::privileged::RVPrivileged;
 
 impl Instruction for RVPrivileged {
     fn execute(&self, cpu: &mut CPU, _mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt> {
