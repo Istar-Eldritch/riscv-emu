@@ -1,7 +1,8 @@
 mod cpu;
 mod emulator;
 mod instructions;
-pub mod memory;
+mod mcu;
+mod memory;
 mod terminal;
 mod utils;
 
