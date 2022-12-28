@@ -1,6 +1,6 @@
+use super::Memory;
 use super::MemoryError;
 use crate::memory::Clocked;
-use crate::Memory;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0

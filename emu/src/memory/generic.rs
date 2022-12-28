@@ -1,5 +1,5 @@
+use super::Memory;
 use super::MemoryError;
-use crate::Memory;
 use std::alloc::{self, Layout};
 use std::ptr::{read_volatile, write_volatile};
 

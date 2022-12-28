@@ -1,5 +1,7 @@
+use super::ExceptionInterrupt;
 use super::Instruction;
-use crate::{CSRs, ExceptionInterrupt, Memory, CPU};
+use crate::memory::Memory;
+use crate::{CSRs, CPU};
 use riscv_isa_types::format::RFormat;
 use riscv_isa_types::privileged::RVPrivileged;
 

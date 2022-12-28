@@ -1,5 +1,5 @@
+use super::Memory;
 use super::MemoryError;
-use crate::Memory;
 use std::ptr::{read_volatile, write_volatile};
 
 pub trait TMappedMemory {

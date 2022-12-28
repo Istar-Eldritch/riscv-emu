@@ -1,6 +1,7 @@
-use super::Instruction;
+use super::{Exception, ExceptionInterrupt, Instruction};
+use crate::memory::Memory;
 use crate::utils::*;
-use crate::{Exception, ExceptionInterrupt, Memory, CPU};
+use crate::CPU;
 use riscv_isa_types::format::*;
 use riscv_isa_types::rv32i::RV32i;
 
