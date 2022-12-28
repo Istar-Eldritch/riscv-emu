@@ -5,42 +5,15 @@ use crate::memory::{uart::UARTDevice, ClockedMemory, MMU};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::io::{BufWriter, Write};
 
-pub struct Emulator {
+// Micro controller unit
+pub struct MCU {
     cpu: CPU,
     mem: Box<dyn ClockedMemory>,
-    speed: u32, // speed in hz
-    dump_path: std::path::PathBuf,
-    cycles: usize,
 }
 
-fn wait_cycles(hz: u32, cycles: u32) {
-    std::thread::sleep(std::time::Duration::from_nanos(
-        (1e9 / hz as f64).round() as u64 * cycles as u64,
-    ))
-}
-
-pub enum TickResult {
-    WFI,
-    HALT,
-    Dump(std::ops::RangeInclusive<u32>),
-    Cycles(u32),
-}
-
-pub struct EmulatorOpts {
-    pub speed: u32,
-    pub terminal: Option<Box<dyn UARTDevice>>,
-    pub dump_path: std::path::PathBuf,
-}
-
-impl Emulator {
-    pub fn new(opts: EmulatorOpts) -> Self {
-        Emulator {
-            cpu: CPU::new(),
-            mem: Box::new(MMU::new(opts.terminal)),
-            speed: opts.speed,
-            dump_path: opts.dump_path,
-            cycles: 0,
-        }
+impl MCU {
+    fn new(cpu: CPU, mem: Box<dyn ClockedMemory>) -> Self {
+        Self { cpu, mem }
     }
 
     pub fn flash(&mut self, mem: Vec<u8>) {
@@ -54,13 +27,11 @@ impl Emulator {
             log::trace!("instruction: {:?}", v);
             let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
             v.update_pc(&mut self.cpu);
-            self.cycles += cost as usize;
             cost
         } else if let Ok(v) = RV32i::try_from(word) {
             log::trace!("instruction: {:?}", v);
             let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
             v.update_pc(&mut self.cpu);
-            self.cycles += cost as usize;
             cost
         } else {
             log::error!("error decoding instruction: {word:b} at {:x}", self.cpu.pc);
@@ -242,25 +213,62 @@ impl Emulator {
         self.cpu.pc = mtvec;
         TickResult::Cycles(4)
     }
+}
+
+pub struct Emulator {
+    mcu: MCU,
+    speed: u32, // speed in hz
+    dump_path: std::path::PathBuf,
+}
+
+fn wait_cycles(hz: u32, cycles: u32) {
+    std::thread::sleep(std::time::Duration::from_nanos(
+        (1e9 / hz as f64).round() as u64 * cycles as u64,
+    ))
+}
+
+pub enum TickResult {
+    WFI,
+    HALT,
+    Dump(std::ops::RangeInclusive<u32>),
+    Cycles(u32),
+}
+
+pub struct EmulatorOpts {
+    pub speed: u32,
+    pub terminal: Option<Box<dyn UARTDevice>>,
+    pub dump_path: std::path::PathBuf,
+}
+
+impl Emulator {
+    pub fn new(opts: EmulatorOpts) -> Self {
+        Emulator {
+            mcu: MCU::new(CPU::new(), Box::new(MMU::new(opts.terminal))),
+            speed: opts.speed,
+            dump_path: opts.dump_path,
+        }
+    }
 
     pub fn run_program(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut pending_work = 0;
+        let mut cycles = 0;
         loop {
             if pending_work > 0 {
                 pending_work -= 1;
                 wait_cycles(self.speed, 1);
             } else {
-                match self.tick() {
+                match self.mcu.tick() {
                     TickResult::Cycles(v) => {
-                        log::trace!("cycle: {}", self.cycles);
+                        log::trace!("cycle: {}", cycles);
+                        cycles += v;
                         pending_work += v
                     }
                     TickResult::WFI => pending_work += 1, // TODO: This should actually block on a callback  instead of doing polling
                     TickResult::HALT => return Ok(()),
                     TickResult::Dump(range) => {
-                        self.cpu.set_x(10, 0);
+                        self.mcu.cpu.set_x(10, 0);
 
-                        let dump_path = self.dump_path.join(format!("{}.dump", self.cycles));
+                        let dump_path = self.dump_path.join(format!("{}.dump", cycles));
                         log::info!(
                             "Dump from {:x} to {:x} at {}",
                             range.start(),
@@ -288,9 +296,13 @@ impl Emulator {
         W: Write,
     {
         for addr in range {
-            let entry = self.mem.rb(addr)?;
+            let entry = self.mcu.mem.rb(addr)?;
             writer.write(&[entry])?;
         }
         Ok(())
+    }
+
+    pub fn flash(&mut self, mem: Vec<u8>) {
+        self.mcu.flash(mem)
     }
 }
