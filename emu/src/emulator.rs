@@ -1,7 +1,7 @@
+use crate::cpu::{CSRs, CPU};
 use crate::instructions::Instruction;
 use crate::instructions::{Exception, ExceptionInterrupt, Interrupt};
 use crate::memory::{uart::UARTDevice, ClockedMemory, MMU};
-use crate::{CSRs, CPU};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::io::{BufWriter, Write};
 
@@ -168,11 +168,7 @@ impl Emulator {
         } else if let Ok(0) = word {
             self.handle_exception(ExceptionInterrupt::Exception(Exception::IllegalInstruction))
         } else if let Ok(addr) = word {
-            if log::log_enabled!(log::Level::Trace) {
-                let csrs = self.cpu.csr.map(|c| format!("{c:b}"));
-                let x = self.cpu.x.map(|x| format!("{x:x}"));
-                log::trace!("executing - : csr: {csrs:?}, pc: {pc:x}, x: {x:?}");
-            }
+            self.cpu.log_registers();
             match self.run_instruction(addr) {
                 Ok(v) => TickResult::Cycles(v),
                 Err(err) => self.handle_exception(err),

@@ -1,4 +1,4 @@
-use crate::{memory::Memory, CPU};
+use crate::{cpu::CPU, memory::Memory};
 pub mod privileged;
 pub mod rv32i;
 
@@ -22,19 +22,27 @@ pub enum Interrupt {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Exception {
+    #[allow(dead_code)]
     InstructionAddressMissaligned = 0,
     InstructionAccessFault = 1,
     IllegalInstruction = 2,
     Breakpoint = 3,
+    #[allow(dead_code)]
     LoadAddressMisaligned = 4,
     LoadAccessFault = 5,
+    #[allow(dead_code)]
     StoreAddressMisaligned = 6,
     StoreAccessFault = 7,
+    #[allow(dead_code)]
     UEnvironmentCall = 8,
+    #[allow(dead_code)]
     SEnvironmentCall = 9,
     MEnvironmentCall = 11,
+    #[allow(dead_code)]
     InstructionPageFault = 12,
+    #[allow(dead_code)]
     LoadPageFault = 13,
+    #[allow(dead_code)]
     StorePageFault = 14,
 }
 
