@@ -1,4 +1,4 @@
-use crate::memory::Clocked;
+use crate::memory::{Clocked, ClockedMemory, Device};
 use crate::memory::{Memory, MemoryError};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -33,6 +33,10 @@ impl UART {
         }
     }
 
+    pub fn get_ip(&self) -> u32 {
+        self.ip
+    }
+
     fn read(&self) -> u32 {
         let mut r_fifo = self.r_fifo.borrow_mut();
         if let Some(b) = r_fifo.pop_back() {
@@ -44,6 +48,16 @@ impl UART {
 
     fn write(&mut self, v: u8) -> () {
         self.t_fifo.push_front(v)
+    }
+}
+
+impl<'a> TryFrom<&'a Device> for &'a UART {
+    type Error = ();
+    fn try_from(device: &Device) -> Result<&UART, Self::Error> {
+        match device {
+            Device::UART(u) => Ok(u),
+            _ => Err(()),
+        }
     }
 }
 
@@ -79,6 +93,16 @@ impl Clocked<()> for UART {
         } else {
             self.ip = self.ip & !0b01;
         }
+    }
+}
+
+impl ClockedMemory for UART {
+    fn as_mut_mem(&mut self) -> &mut dyn Memory {
+        self
+    }
+
+    fn as_mem(&self) -> &dyn Memory {
+        self
     }
 }
 

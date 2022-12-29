@@ -1,35 +1,63 @@
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Instruction;
 use crate::instructions::{Exception, ExceptionInterrupt, Interrupt};
-use crate::memory::ClockedMemory;
+use crate::memory::{clint::CLINT, plic::PLIC, Clocked, DeviceMeta, Memory, MMU};
+use crate::memory::{Device, DeviceMap};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
+use std::collections::HashMap;
+
+pub struct DeviceDef {
+    pub identifier: String,
+    pub memory_start: u32,
+    pub memory_end: u32,
+    pub device: Device,
+}
 
 // Micro controller unit
 pub struct MCU {
     cpu: CPU,
-    mem: Box<dyn ClockedMemory>,
+    mmu: MMU,
+    devices: DeviceMap,
 }
 
 impl MCU {
-    pub fn new(cpu: CPU, mem: Box<dyn ClockedMemory>) -> Self {
-        Self { cpu, mem }
+    pub fn new() -> Self {
+        let devices = std::rc::Rc::new(std::cell::RefCell::new(HashMap::new()));
+        Self {
+            cpu: CPU::new(),
+            mmu: MMU::new(std::rc::Rc::clone(&devices)),
+            devices,
+        }
+    }
+
+    pub fn add_device(&mut self, device: DeviceDef) -> Result<&mut Self, ()> {
+        self.mmu.insert_device(DeviceMeta::new(
+            device.identifier.clone(),
+            device.memory_start,
+            device.memory_end,
+        ))?;
+        self.devices
+            .borrow_mut()
+            .insert(device.identifier, device.device);
+
+        Ok(self)
     }
 
     pub fn flash(&mut self, mem: Vec<u8>) {
         for i in 0..mem.len() {
-            self.mem.wb(i as u32, mem[i]).unwrap();
+            self.mmu.wb(i as u32, mem[i]).unwrap();
         }
     }
 
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
+            let cost = v.execute(&mut self.cpu, &mut self.mmu)?;
             v.update_pc(&mut self.cpu);
             cost
         } else if let Ok(v) = RV32i::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            let cost = v.execute(&mut self.cpu, self.mem.as_mut_mem())?;
+            let cost = v.execute(&mut self.cpu, &mut self.mmu)?;
             v.update_pc(&mut self.cpu);
             cost
         } else {
@@ -42,11 +70,14 @@ impl MCU {
 
     /// Software interrupt pending check
     fn update_mip_msip(&mut self) {
-        let software_interrupt = self.mem.rw(0x200_0000).unwrap();
+        let mut devices = self.devices.borrow_mut();
+        let mut clint: &mut CLINT = devices.get_mut("CLINT").unwrap().try_into().unwrap();
+
+        let software_interrupt = clint.msip0;
 
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_msi = if software_interrupt > 0 {
-            self.mem.ww(0x200_0000, 0).unwrap();
+            clint.msip0 = 0;
             mip | (1 << Interrupt::MSoftInterrupt as u32)
         } else {
             mip & !(1 << Interrupt::MSoftInterrupt as u32)
@@ -58,13 +89,12 @@ impl MCU {
     /// Timer interrupt pending check
     fn update_mip_mtip(&mut self) {
         use Interrupt::*;
+        let devices = self.devices.borrow_mut();
+        let clint: &CLINT = devices.get("CLINT").unwrap().try_into().unwrap();
 
-        let cmp_time: u64 = self.mem.rw(0x200_4000).unwrap() as u64;
+        let cmp_time = clint.mtimecmp;
 
-        let cmp_time: u64 = cmp_time | ((self.mem.rw(0x200_4004).unwrap() as u64) << 4);
-
-        let time: u64 = self.mem.rw(0x200_bff8).unwrap() as u64;
-        let time: u64 = time | ((self.mem.rw(0x200_bffc).unwrap() as u64) << 4);
+        let time = clint.mtime;
 
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_mti = if cmp_time != 0 && time >= cmp_time {
@@ -77,8 +107,9 @@ impl MCU {
 
     /// External interrupt pending bit check
     fn update_mip_meip(&mut self) {
-        let external_interrupts = self.mem.rw(0x0c00_1000).unwrap() as u64
-            | ((self.mem.rw(0x0c00_1004).unwrap() as u64) << 4);
+        let devices = self.devices.borrow();
+        let plic: &PLIC = devices.get("PLIC").unwrap().try_into().unwrap();
+        let external_interrupts = *plic.pending.borrow();
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_mei = if external_interrupts != 0 {
             mip | (1 << Interrupt::MExternalInterrupt as u32)
@@ -116,9 +147,20 @@ impl MCU {
     }
 
     pub fn tick(&mut self) -> TickResult {
-        self.mem.tick(());
+        self.mmu.tick(());
+        {
+            let mut devices = self.devices.borrow_mut();
+            for (_k, device) in devices.iter_mut() {
+                match device {
+                    Device::PLIC(p) => p.tick(&self.devices),
+                    Device::CLINT(c) => c.tick(()),
+                    Device::UART(u) => u.tick(()),
+                    Device::FLASH(_f) => {}
+                }
+            }
+        }
         let pc = self.cpu.pc;
-        let word = self.mem.rw(pc);
+        let word = self.mmu.rw(pc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
         let mstatus_mie = (mstatus & (1 << 3)) != 0;
 
@@ -168,9 +210,11 @@ impl MCU {
                     if i == Interrupt::MExternalInterrupt {
                         // XXX: For external interrupts, this implementation resets the PLIC pending
                         // bit, and sets the interrupt value to mtval which may not be the correct vehaviour.
-                        let plic_int = self.mem.rw(0x0c20_0004).unwrap();
+                        let devices = self.devices.borrow();
+                        let plic: &PLIC = devices.get("PLIC").unwrap().try_into().unwrap();
+
+                        let plic_int = plic.claim_interrupt();
                         self.cpu.set_csr(CSRs::mtval as u32, plic_int).unwrap();
-                        self.mem.ww(0x0c20_0004, plic_int).unwrap();
                     }
                     // XXX: This implementation reset the pending interrupt bit before the handler
                     // executes it, I'm not sure this is the correct behaviour

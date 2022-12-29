@@ -1,4 +1,4 @@
-use super::{uart::UART, Memory, MemoryError};
+use super::{Device, DeviceMap, Memory, MemoryError};
 use crate::memory::Clocked;
 use std::cell::RefCell;
 
@@ -18,6 +18,14 @@ impl PLIC {
             h0mie: 0,
             h0mpt: 0,
         }
+    }
+
+    pub fn claim_interrupt(&self) -> u32 {
+        let mut interrupts = self.get_interrupts();
+        let interrupt = interrupts.pop().unwrap_or(0);
+        let mut pending = self.pending.borrow_mut();
+        *pending = *pending & !(1 << interrupt);
+        interrupt
     }
 
     // Returns the enabled and pending interrupts ordered by priority
@@ -42,16 +50,37 @@ impl PLIC {
     }
 }
 
-impl Clocked<&UART> for PLIC {
-    fn tick(&mut self, uart0: &UART) {
-        let mut pending = self.pending.borrow_mut();
+impl<'a> TryFrom<&'a Device> for &'a PLIC {
+    type Error = ();
+    fn try_from(device: &Device) -> Result<&PLIC, Self::Error> {
+        match device {
+            Device::PLIC(p) => Ok(p),
+            _ => Err(()),
+        }
+    }
+}
 
-        let uart0_ip = uart0.rw(0x14).unwrap();
-        if uart0_ip != 0 {
-            *pending |= 0b10 as u64;
-        } else {
-            *pending &= !(0b10 as u64);
-        };
+impl Clocked<&DeviceMap> for PLIC {
+    // This updates the external interrupts based on the device order. if UART0 is added 3rd then
+    // 0b1000 will denote a pending interrupt on uart0
+    fn tick(&mut self, devices: &DeviceMap) {
+        let devices = devices.borrow();
+
+        let mut pending = self.pending.borrow_mut();
+        for (idx, (_k, device)) in devices.iter().enumerate() {
+            match device {
+                Device::UART(u) => {
+                    let uart_ip = u.get_ip();
+                    let mask = 1 << idx + 1;
+                    if uart_ip != 0 {
+                        *pending |= mask as u64;
+                    } else {
+                        *pending &= !(mask as u64);
+                    };
+                }
+                _ => {}
+            }
+        }
     }
 }
 
@@ -82,10 +111,7 @@ impl Memory for PLIC {
             0x20_0000 => Ok(self.h0mpt),
             0x20_0004 => {
                 // XXX: Should we keep a list of claimed interrupts?
-                let mut interrupts = self.get_interrupts();
-                let interrupt = interrupts.pop().unwrap_or(0);
-                let mut pending = self.pending.borrow_mut();
-                *pending = *pending & !(1 << interrupt);
+                let interrupt = self.claim_interrupt();
                 Ok(interrupt)
             }
             _ => Err(MemoryError::AccessFault),

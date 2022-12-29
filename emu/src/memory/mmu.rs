@@ -1,21 +1,37 @@
-use super::clint::CLINT;
-use super::plic::PLIC;
-use super::uart::{UARTDevice, UART};
-use super::{Clocked, ClockedMemory, GenericMemory, Memory, MemoryError};
+use super::{Clocked, ClockedMemory, DeviceMap, Memory, MemoryError};
+
+pub struct DeviceMeta {
+    mem_start: u32,
+    mem_end: u32,
+    identifier: String,
+}
+
+impl DeviceMeta {
+    pub fn new(identifier: String, mem_start: u32, mem_end: u32) -> Self {
+        Self {
+            mem_start,
+            mem_end,
+            identifier,
+        }
+    }
+}
 
 pub struct MMU {
-    flash: GenericMemory,
-    clint: CLINT,
-    plic: PLIC,
-    uart0: UART,
+    device_idx: Vec<DeviceMeta>,
+    devices: DeviceMap,
+}
+
+impl MMU {
+    pub fn new(devices: DeviceMap) -> Self {
+        MMU {
+            device_idx: Vec::new(),
+            devices,
+        }
+    }
 }
 
 impl Clocked<()> for MMU {
-    fn tick(&mut self, _: ()) {
-        self.clint.tick(());
-        self.uart0.tick(());
-        self.plic.tick(&self.uart0);
-    }
+    fn tick(&mut self, _: ()) {}
 }
 
 impl ClockedMemory for MMU {
@@ -28,70 +44,102 @@ impl ClockedMemory for MMU {
 }
 
 impl MMU {
-    pub fn new(terminal: Option<Box<dyn UARTDevice>>) -> Self {
-        Self {
-            flash: GenericMemory::new(0x3_2000),
-            clint: CLINT::new(),
-            plic: PLIC::new(),
-            uart0: UART::new(terminal),
-        }
-    }
-    fn get_mem_mut(&mut self, addr: u32) -> Result<Box<&mut dyn Memory>, MemoryError> {
-        match addr {
-            v if v <= 0x0003_2000 => Ok(Box::new(&mut self.flash)), //
-            v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&mut self.clint)),
-            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&mut self.plic)),
-            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(Box::new(&mut self.uart0)),
-            _ => Err(MemoryError::AccessFault),
+    fn find_device_meta(&self, addr: u32) -> Option<&DeviceMeta> {
+        let search_result = self.device_idx.binary_search_by(|d| {
+            if addr < d.mem_start {
+                std::cmp::Ordering::Less
+            } else if addr > d.mem_end {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+
+        if let Ok(idx) = search_result {
+            Some(&self.device_idx.get(idx).unwrap())
+        } else {
+            None
         }
     }
 
-    fn get_mem(&self, addr: u32) -> Result<Box<&dyn Memory>, MemoryError> {
-        match addr {
-            v if v <= 0x0003_2000 => Ok(Box::new(&self.flash)), //
-            v if v >= 0x0200_0000 && v < 0x200_FFFF => Ok(Box::new(&self.clint)),
-            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(Box::new(&self.plic)),
-            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(Box::new(&self.uart0)),
-            _ => Err(MemoryError::AccessFault),
-        }
-    }
-
-    fn translate_address(addr: u32) -> Result<u32, MemoryError> {
-        match addr {
-            v if v <= 0x0003_2000 => Ok(addr), //
-            v if v >= 0x0200_0000 && v < 0x0200_FFFF => Ok(addr - 0x200_0000),
-            v if v >= 0x0C00_0000 && v < 0x1000_0000 => Ok(addr - 0xC00_0000),
-            v if v >= 0x1001_3000 && v < 0x1001_3FFF => Ok(addr - 0x1001_3000),
-            _ => Err(MemoryError::AccessFault),
+    /// Returns an error if the device overlaps memory with another
+    pub fn insert_device(&mut self, meta: DeviceMeta) -> Result<(), ()> {
+        let search_result = self.device_idx.binary_search_by(|d| {
+            if meta.mem_start > d.mem_end {
+                std::cmp::Ordering::Greater
+            } else if meta.mem_end < d.mem_start {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+        if let Err(idx) = search_result {
+            self.device_idx.insert(idx, meta);
+            Ok(())
+        } else {
+            Err(())
         }
     }
 }
 
 impl Memory for MMU {
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
-        self.get_mem(addr)?.rb(MMU::translate_address(addr)?)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let devices = self.devices.borrow();
+            let device = devices.get(&meta.identifier).unwrap();
+            device.rb(addr - meta.mem_start)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 
     fn wb(&mut self, addr: u32, value: u8) -> Result<(), MemoryError> {
-        self.get_mem_mut(addr)?
-            .wb(MMU::translate_address(addr)?, value)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let mut devices = self.devices.borrow_mut();
+            let device = devices.get_mut(&meta.identifier).unwrap();
+            device.wb(addr - meta.mem_start, value)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 
     fn rhw(&self, addr: u32) -> Result<u16, MemoryError> {
-        self.get_mem(addr)?.rhw(MMU::translate_address(addr)?)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let devices = self.devices.borrow();
+            let device = devices.get(&meta.identifier).unwrap();
+            device.rhw(addr - meta.mem_start)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 
     fn whw(&mut self, addr: u32, value: u16) -> Result<(), MemoryError> {
-        self.get_mem_mut(addr)?
-            .whw(MMU::translate_address(addr)?, value)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let mut devices = self.devices.borrow_mut();
+            let device = devices.get_mut(&meta.identifier).unwrap();
+            device.whw(addr - meta.mem_start, value)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 
     fn rw(&self, addr: u32) -> Result<u32, MemoryError> {
-        self.get_mem(addr)?.rw(MMU::translate_address(addr)?)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let devices = self.devices.borrow();
+            let device = devices.get(&meta.identifier).unwrap();
+            device.rw(addr - meta.mem_start)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 
     fn ww(&mut self, addr: u32, value: u32) -> Result<(), MemoryError> {
-        self.get_mem_mut(addr)?
-            .ww(MMU::translate_address(addr)?, value)
+        if let Some(meta) = self.find_device_meta(addr) {
+            let mut devices = self.devices.borrow_mut();
+            let device = devices.get_mut(&meta.identifier).unwrap();
+            device.ww(addr - meta.mem_start, value)
+        } else {
+            Err(MemoryError::AccessFault)
+        }
     }
 }

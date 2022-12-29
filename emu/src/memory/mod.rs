@@ -1,8 +1,8 @@
-mod clint;
+pub mod clint;
 mod generic;
 mod mapped_memory;
 mod mmu;
-mod plic;
+pub mod plic;
 pub mod uart;
 
 pub use generic::GenericMemory;
@@ -43,3 +43,37 @@ pub trait Memory {
 
     fn ww(&mut self, addr: u32, value: u32) -> Result<(), MemoryError>;
 }
+
+pub enum Device {
+    PLIC(plic::PLIC),
+    CLINT(clint::CLINT),
+    UART(uart::UART),
+    FLASH(GenericMemory),
+}
+
+impl std::ops::Deref for Device {
+    type Target = dyn Memory;
+    fn deref(&self) -> &(dyn Memory + 'static) {
+        use Device::*;
+        match self {
+            PLIC(p) => p,
+            CLINT(c) => c,
+            UART(u) => u,
+            FLASH(f) => f,
+        }
+    }
+}
+
+impl std::ops::DerefMut for Device {
+    fn deref_mut(&mut self) -> &mut (dyn Memory + 'static) {
+        use Device::*;
+        match self {
+            PLIC(p) => p,
+            CLINT(c) => c,
+            UART(u) => u,
+            FLASH(f) => f,
+        }
+    }
+}
+
+pub type DeviceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, Device>>>;

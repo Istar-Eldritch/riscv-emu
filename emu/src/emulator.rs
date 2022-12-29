@@ -1,6 +1,5 @@
-use crate::cpu::CPU;
-use crate::mcu::{TickResult, MCU};
-use crate::memory::{uart::UARTDevice, MMU};
+use crate::mcu::{DeviceDef, TickResult, MCU};
+use crate::memory::uart::UARTDevice;
 
 pub struct Emulator {
     mcu: MCU,
@@ -21,10 +20,19 @@ pub struct EmulatorOpts {
 
 impl Emulator {
     pub fn new(opts: EmulatorOpts) -> Self {
+        let mcu = MCU::new();
         Emulator {
-            mcu: MCU::new(CPU::new(), Box::new(MMU::new(opts.terminal))),
+            mcu,
             speed: opts.speed,
         }
+    }
+
+    pub fn setup_devices(&mut self, devices: Vec<DeviceDef>) -> Result<(), ()> {
+        for device in devices.into_iter() {
+            self.mcu.add_device(device)?;
+        }
+
+        Ok(())
     }
 
     pub fn run_program(&mut self) -> Result<(), Box<dyn std::error::Error>> {

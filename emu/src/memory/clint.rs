@@ -1,6 +1,7 @@
 use super::Memory;
 use super::MemoryError;
 use crate::memory::Clocked;
+use crate::memory::Device;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -14,6 +15,26 @@ impl CLINT {
             msip0: 0,
             mtimecmp: 0,
             mtime: 0,
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Device> for &'a CLINT {
+    type Error = ();
+    fn try_from(device: &Device) -> Result<&CLINT, Self::Error> {
+        match device {
+            Device::CLINT(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a mut Device> for &'a mut CLINT {
+    type Error = ();
+    fn try_from(device: &mut Device) -> Result<&mut CLINT, Self::Error> {
+        match device {
+            Device::CLINT(c) => Ok(c),
+            _ => Err(()),
         }
     }
 }
