@@ -7,8 +7,13 @@ mod terminal;
 mod utils;
 
 pub use emulator::{Emulator, EmulatorOpts};
-pub use mcu::DeviceDef;
-pub use memory::{clint::CLINT, plic::PLIC, uart::UART, Device, GenericMemory};
+pub use mcu::{DeviceDef, TickResult, MCU};
+pub use memory::{
+    clint::CLINT,
+    plic::PLIC,
+    uart::{UARTDevice, UART},
+    Device, GenericMemory,
+};
 pub use terminal::TermEmulator;
 
 #[cfg(test)]
