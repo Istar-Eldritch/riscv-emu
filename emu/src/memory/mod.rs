@@ -4,7 +4,6 @@ mod mapped_memory;
 mod mmu;
 pub mod plic;
 pub mod uart;
-
 pub use generic::GenericMemory;
 pub use mmu::*;
 
@@ -76,4 +75,5 @@ impl std::ops::DerefMut for Device {
     }
 }
 
-pub type DeviceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, Device>>>;
+pub type DeviceMap =
+    std::rc::Rc<std::cell::RefCell<std::collections::BTreeMap<String, std::cell::RefCell<Device>>>>;

@@ -24,7 +24,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut builder = env_logger::Builder::new();
     builder.parse_filters(&args.log.unwrap_or("info".into()));
     builder.init();
-    let file = fs::File::open(args.flash)?;
+    let file = fs::File::open(args.flash).map_err(|err| {
+        log::error!("Error geting flash image: {}", err);
+        err
+    })?;
     let mut br = BufReader::new(file);
     let mut mem: Vec<u8> = Vec::new();
     br.read_to_end(&mut mem)?;
@@ -38,7 +41,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         dump_path: std::path::PathBuf::from(
             args.dump_folder.unwrap_or(
                 std::env::current_dir()
-                    .unwrap()
+                    .unwrap_or_else(|err| {
+                        log::error!("Error getting hold of the current directory");
+                        panic!("{}", err)
+                    })
                     .to_string_lossy()
                     .to_string(),
             ),
@@ -60,7 +66,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         DeviceDef {
             identifier: "PLIC".to_string(),
-            memory_start: 0x0C000_0000,
+            memory_start: 0x0C00_0000,
             memory_end: 0x1000_0000,
             device: Device::PLIC(PLIC::new()),
         },

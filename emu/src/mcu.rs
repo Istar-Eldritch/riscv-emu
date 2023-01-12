@@ -4,7 +4,7 @@ use crate::instructions::{Exception, ExceptionInterrupt, Interrupt};
 use crate::memory::{clint::CLINT, plic::PLIC, Clocked, DeviceMeta, Memory, MMU};
 use crate::memory::{Device, DeviceMap};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub struct DeviceDef {
     pub identifier: String,
@@ -22,7 +22,7 @@ pub struct MCU {
 
 impl MCU {
     pub fn new() -> Self {
-        let devices = std::rc::Rc::new(std::cell::RefCell::new(HashMap::new()));
+        let devices = std::rc::Rc::new(std::cell::RefCell::new(BTreeMap::new()));
         Self {
             cpu: CPU::new(),
             mmu: MMU::new(std::rc::Rc::clone(&devices)),
@@ -38,8 +38,7 @@ impl MCU {
         ))?;
         self.devices
             .borrow_mut()
-            .insert(device.identifier, device.device);
-
+            .insert(device.identifier, std::cell::RefCell::new(device.device));
         Ok(self)
     }
 
@@ -70,8 +69,9 @@ impl MCU {
 
     /// Software interrupt pending check
     fn update_mip_msip(&mut self) {
-        let mut devices = self.devices.borrow_mut();
-        let mut clint: &mut CLINT = devices.get_mut("CLINT").unwrap().try_into().unwrap();
+        let devices = self.devices.borrow();
+        let clintref = &mut *devices.get("CLINT").unwrap().borrow_mut();
+        let mut clint: &mut CLINT = clintref.try_into().unwrap();
 
         let software_interrupt = clint.msip0;
 
@@ -90,7 +90,8 @@ impl MCU {
     fn update_mip_mtip(&mut self) {
         use Interrupt::*;
         let devices = self.devices.borrow_mut();
-        let clint: &CLINT = devices.get("CLINT").unwrap().try_into().unwrap();
+        let clintref = &*devices.get("CLINT").unwrap().borrow();
+        let clint: &CLINT = clintref.try_into().unwrap();
 
         let cmp_time = clint.mtimecmp;
 
@@ -108,7 +109,8 @@ impl MCU {
     /// External interrupt pending bit check
     fn update_mip_meip(&mut self) {
         let devices = self.devices.borrow();
-        let plic: &PLIC = devices.get("PLIC").unwrap().try_into().unwrap();
+        let plicref = &*devices.get("PLIC").unwrap().borrow();
+        let plic: &PLIC = plicref.try_into().unwrap();
         let external_interrupts = *plic.pending.borrow();
         let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
         let mip_mei = if external_interrupts != 0 {
@@ -149,9 +151,10 @@ impl MCU {
     pub fn tick(&mut self) -> TickResult {
         self.mmu.tick(());
         {
-            let mut devices = self.devices.borrow_mut();
-            for (_k, device) in devices.iter_mut() {
-                match device {
+            let devices = self.devices.borrow();
+            for (_k, device) in devices.iter() {
+                let deviceref = &mut *device.borrow_mut();
+                match deviceref {
                     Device::PLIC(p) => p.tick(&self.devices),
                     Device::CLINT(c) => c.tick(()),
                     Device::UART(u) => u.tick(()),
@@ -211,7 +214,8 @@ impl MCU {
                         // XXX: For external interrupts, this implementation resets the PLIC pending
                         // bit, and sets the interrupt value to mtval which may not be the correct vehaviour.
                         let devices = self.devices.borrow();
-                        let plic: &PLIC = devices.get("PLIC").unwrap().try_into().unwrap();
+                        let plicref = &*devices.get("PLIC").unwrap().borrow();
+                        let plic: &PLIC = plicref.try_into().unwrap();
 
                         let plic_int = plic.claim_interrupt();
                         self.cpu.set_csr(CSRs::mtval as u32, plic_int).unwrap();
