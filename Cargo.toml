@@ -3,5 +3,6 @@
 members = [
   "emu",
   "riscv_isa_types",
-  "macros"
+  "macros",
+  "c_bindings"
 ]
