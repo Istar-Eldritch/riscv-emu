@@ -4,15 +4,16 @@ use std::alloc::{self, Layout};
 use std::ptr::{read_volatile, write_volatile};
 
 pub struct GenericMemory {
+    layout: Layout,
     size: u32, // size in bytes
     addr: *mut u8,
 }
 
 impl GenericMemory {
-    // TODO Implement DROP
     pub fn new(size: u32) -> Self {
-        let addr = unsafe { alloc::alloc(Layout::from_size_align(size as usize, 4).unwrap()) };
-        Self { size, addr }
+        let layout = Layout::from_size_align(size as usize, 4).unwrap();
+        let addr = unsafe { alloc::alloc(layout) };
+        Self { size, addr, layout }
     }
 
     fn validate(&self, addr: u32, len: u32) -> Result<(), MemoryError> {
@@ -20,6 +21,12 @@ impl GenericMemory {
             return Err(MemoryError::AccessFault);
         }
         Ok(())
+    }
+}
+
+impl Drop for GenericMemory {
+    fn drop(&mut self) {
+        unsafe { alloc::dealloc(self.addr, self.layout) }
     }
 }
 
