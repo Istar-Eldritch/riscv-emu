@@ -1,5 +1,5 @@
 use crate::mcu::{DeviceDef, TickResult, MCU};
-use crate::memory::uart::UARTDevice;
+use crate::peripherals::uart::UARTDevice;
 
 pub struct Emulator {
     mcu: MCU,

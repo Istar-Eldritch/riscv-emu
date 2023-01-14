@@ -1,20 +1,11 @@
-mod cpu;
-mod emulator;
-mod instructions;
-mod mcu;
-mod memory;
-mod terminal;
-mod utils;
-
-pub use emulator::{Emulator, EmulatorOpts};
-pub use mcu::{DeviceDef, TickResult, MCU};
-pub use memory::{
-    clint::CLINT,
-    plic::PLIC,
-    uart::{UARTDevice, UART},
-    Device, GenericMemory,
-};
-pub use terminal::TermEmulator;
+pub mod cpu;
+pub mod emulator;
+pub mod instructions;
+pub mod mcu;
+pub mod memory;
+pub mod peripherals;
+pub mod terminal;
+pub mod utils;
 
 #[cfg(test)]
 mod tests {

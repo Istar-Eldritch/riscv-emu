@@ -1,4 +1,4 @@
-use crate::memory::uart::UARTDevice;
+use crate::peripherals::uart::UARTDevice;
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};

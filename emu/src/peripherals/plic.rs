@@ -1,7 +1,8 @@
-use super::{Device, Memory, MemoryError};
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
 use crate::memory::Clocked;
+use crate::memory::{Memory, MemoryError};
+use crate::peripherals::Peripheral;
 use std::cell::RefCell;
 
 pub struct PLIC {
@@ -65,11 +66,11 @@ impl PLIC {
     }
 }
 
-impl<'a> TryFrom<&'a Device> for &'a PLIC {
+impl<'a> TryFrom<&'a Peripheral> for &'a PLIC {
     type Error = ();
-    fn try_from(device: &Device) -> Result<&PLIC, Self::Error> {
+    fn try_from(device: &Peripheral) -> Result<&PLIC, Self::Error> {
         match device {
-            Device::PLIC(p) => Ok(p),
+            Peripheral::PLIC(p) => Ok(p),
             _ => Err(()),
         }
     }

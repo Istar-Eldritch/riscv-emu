@@ -1,8 +1,9 @@
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Instruction;
 use crate::instructions::{Exception, ExceptionInterrupt};
+use crate::memory::DeviceMap;
 use crate::memory::{Clocked, DeviceMeta, Memory, MMU};
-use crate::memory::{Device, DeviceMap};
+use crate::peripherals::Peripheral;
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::collections::BTreeMap;
 
@@ -10,7 +11,7 @@ pub struct DeviceDef {
     pub identifier: String,
     pub memory_start: u32,
     pub memory_end: u32,
-    pub device: Device,
+    pub device: Peripheral,
 }
 
 // Micro controller unit
@@ -74,10 +75,10 @@ impl MCU {
             for (_k, device) in devices.iter() {
                 let deviceref = &mut *device.borrow_mut();
                 match deviceref {
-                    Device::UART(u) => u.tick((&self.devices, &mut self.cpu)),
-                    Device::PLIC(p) => p.tick(&mut self.cpu),
-                    Device::CLINT(c) => c.tick(&mut self.cpu),
-                    Device::FLASH(_f) => {}
+                    Peripheral::UART(u) => u.tick((&self.devices, &mut self.cpu)),
+                    Peripheral::PLIC(p) => p.tick(&mut self.cpu),
+                    Peripheral::CLINT(c) => c.tick(&mut self.cpu),
+                    Peripheral::FLASH(_f) => {}
                 }
             }
         }

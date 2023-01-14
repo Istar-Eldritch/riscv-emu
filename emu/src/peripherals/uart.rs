@@ -1,7 +1,8 @@
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
-use crate::memory::{Clocked, ClockedMemory, Device, DeviceMap};
+use crate::memory::{Clocked, ClockedMemory, DeviceMap};
 use crate::memory::{Memory, MemoryError};
+use crate::peripherals::Peripheral;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
@@ -59,11 +60,11 @@ impl UART {
     }
 }
 
-impl<'a> TryFrom<&'a Device> for &'a UART {
+impl<'a> TryFrom<&'a Peripheral> for &'a UART {
     type Error = ();
-    fn try_from(device: &Device) -> Result<&UART, Self::Error> {
+    fn try_from(device: &Peripheral) -> Result<&UART, Self::Error> {
         match device {
-            Device::UART(u) => Ok(u),
+            Peripheral::UART(u) => Ok(u),
             _ => Err(()),
         }
     }
@@ -107,7 +108,7 @@ impl Clocked<(&DeviceMap, &mut CPU)> for UART {
 
         // If the PLIC is present, update interrupt through the it, otherwise do it directly
         if let Some(Ok(device)) = devices.borrow().get("PLIC").map(|d| d.try_borrow()) {
-            if let Device::PLIC(plic) = &*device {
+            if let Peripheral::PLIC(plic) = &*device {
                 let mut pending = plic.pending.borrow_mut();
                 if uart_ip != 0 {
                     *pending |= self.interrupt_id as u64;

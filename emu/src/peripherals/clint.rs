@@ -1,9 +1,8 @@
-use super::Memory;
-use super::MemoryError;
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
 use crate::memory::Clocked;
-use crate::memory::Device;
+use crate::memory::{Memory, MemoryError};
+use crate::peripherals::Peripheral;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -53,21 +52,21 @@ impl CLINT {
     }
 }
 
-impl<'a> TryFrom<&'a Device> for &'a CLINT {
+impl<'a> TryFrom<&'a Peripheral> for &'a CLINT {
     type Error = ();
-    fn try_from(device: &Device) -> Result<&CLINT, Self::Error> {
+    fn try_from(device: &Peripheral) -> Result<&CLINT, Self::Error> {
         match device {
-            Device::CLINT(c) => Ok(c),
+            Peripheral::CLINT(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryFrom<&'a mut Device> for &'a mut CLINT {
+impl<'a> TryFrom<&'a mut Peripheral> for &'a mut CLINT {
     type Error = ();
-    fn try_from(device: &mut Device) -> Result<&mut CLINT, Self::Error> {
+    fn try_from(device: &mut Peripheral) -> Result<&mut CLINT, Self::Error> {
         match device {
-            Device::CLINT(c) => Ok(c),
+            Peripheral::CLINT(c) => Ok(c),
             _ => Err(()),
         }
     }
