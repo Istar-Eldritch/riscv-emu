@@ -1,5 +1,7 @@
 use super::Memory;
 use super::MemoryError;
+use crate::cpu::{CSRs, CPU};
+use crate::instructions::Interrupt;
 use crate::memory::Clocked;
 use crate::memory::Device;
 
@@ -16,6 +18,38 @@ impl CLINT {
             mtimecmp: 0,
             mtime: 0,
         }
+    }
+
+    /// Software interrupt pending check
+    fn update_mip_msip(&mut self, cpu: &mut CPU) {
+        let software_interrupt = self.msip0;
+
+        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_msi = if software_interrupt > 0 {
+            self.msip0 = 0;
+            mip | (1 << Interrupt::MSoftInterrupt as u32)
+        } else {
+            mip & !(1 << Interrupt::MSoftInterrupt as u32)
+        };
+
+        cpu.set_csr(CSRs::mip as u32, mip_msi).unwrap();
+    }
+
+    /// Timer interrupt pending check
+    fn update_mip_mtip(&mut self, cpu: &mut CPU) {
+        use Interrupt::*;
+
+        let cmp_time = self.mtimecmp;
+
+        let time = self.mtime;
+
+        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_mti = if cmp_time != 0 && time >= cmp_time {
+            mip | (1 << MTimerInterrupt as u32)
+        } else {
+            mip & !(1 << MTimerInterrupt as u32)
+        };
+        cpu.set_csr(CSRs::mip as u32, mip_mti).unwrap();
     }
 }
 
@@ -39,9 +73,18 @@ impl<'a> TryFrom<&'a mut Device> for &'a mut CLINT {
     }
 }
 
-impl Clocked<()> for CLINT {
-    fn tick(&mut self, _: ()) -> () {
-        self.mtime += 1
+impl Clocked<&mut CPU> for CLINT {
+    /// Increases time, generates timer & software interrupts
+    fn tick(&mut self, cpu: &mut CPU) -> () {
+        self.mtime += 1;
+
+        // Generate timer & software interrupts
+        let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
+        let mstatus_mie = (mstatus & (1 << 3)) != 0;
+        if mstatus_mie {
+            self.update_mip_mtip(cpu);
+            self.update_mip_msip(cpu);
+        }
     }
 }
 

@@ -1,4 +1,6 @@
-use crate::memory::{Clocked, ClockedMemory, Device};
+use crate::cpu::{CSRs, CPU};
+use crate::instructions::Interrupt;
+use crate::memory::{Clocked, ClockedMemory, Device, DeviceMap};
 use crate::memory::{Memory, MemoryError};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -17,6 +19,7 @@ pub struct UART {
     ip: u32,  // Interrupt pending
     div: u32, // Baud rate divider br = clk / (br_div + 1)
     device: Option<Box<dyn UARTDevice>>,
+    interrupt_id: u32,
 }
 
 impl UART {
@@ -30,7 +33,12 @@ impl UART {
             ip: 0,
             div: 0,
             device,
+            interrupt_id: 1,
         }
+    }
+
+    pub fn set_interrupt_id(&mut self, id: u32) {
+        self.interrupt_id = id;
     }
 
     pub fn get_ip(&self) -> u32 {
@@ -61,8 +69,9 @@ impl<'a> TryFrom<&'a Device> for &'a UART {
     }
 }
 
-impl Clocked<()> for UART {
-    fn tick(&mut self, _: ()) -> () {
+impl Clocked<(&DeviceMap, &mut CPU)> for UART {
+    fn tick(&mut self, args: (&DeviceMap, &mut CPU)) -> () {
+        let (devices, cpu) = args;
         let mut r_fifo = self.r_fifo.borrow_mut();
         if let Some(device) = &mut self.device {
             // rxen = 1
@@ -93,10 +102,33 @@ impl Clocked<()> for UART {
         } else {
             self.ip = self.ip & !0b01;
         }
+
+        let uart_ip = self.get_ip();
+
+        // If the PLIC is present, update interrupt through the it, otherwise do it directly
+        if let Some(Ok(device)) = devices.borrow().get("PLIC").map(|d| d.try_borrow()) {
+            if let Device::PLIC(plic) = &*device {
+                let mut pending = plic.pending.borrow_mut();
+                if uart_ip != 0 {
+                    *pending |= self.interrupt_id as u64;
+                } else {
+                    *pending &= !(self.interrupt_id as u64);
+                }
+            }
+            // Should we panic here? It would mean the device identified as PLIC is not a plic
+        } else {
+            let mie = cpu.get_csr(CSRs::mie as u32).unwrap()
+                & (1 << Interrupt::MExternalInterrupt as u32);
+            if uart_ip != 0 && mie != 0 {
+                let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
+                let mip_mei = mip | (1 << Interrupt::MExternalInterrupt as u32);
+                cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
+            }
+        }
     }
 }
 
-impl ClockedMemory for UART {
+impl ClockedMemory<(&DeviceMap, &mut CPU)> for UART {
     fn as_mut_mem(&mut self) -> &mut dyn Memory {
         self
     }

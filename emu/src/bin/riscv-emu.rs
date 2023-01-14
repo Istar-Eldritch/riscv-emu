@@ -51,6 +51,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     };
 
+    let mut uart_device = UART::new(Some(Box::new(term)));
+    uart_device.set_interrupt_id(0b10000);
+
     let devices = vec![
         DeviceDef {
             identifier: "FLASH".to_string(),
@@ -74,7 +77,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             identifier: "UART0".to_string(),
             memory_start: 0x1001_3000,
             memory_end: 0x1001_3FFF,
-            device: Device::UART(UART::new(Some(Box::new(term)))),
+            device: Device::UART(uart_device),
         },
     ];
 

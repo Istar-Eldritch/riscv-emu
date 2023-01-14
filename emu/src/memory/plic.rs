@@ -1,4 +1,6 @@
-use super::{Device, DeviceMap, Memory, MemoryError};
+use super::{Device, Memory, MemoryError};
+use crate::cpu::{CSRs, CPU};
+use crate::instructions::Interrupt;
 use crate::memory::Clocked;
 use std::cell::RefCell;
 
@@ -48,6 +50,19 @@ impl PLIC {
         });
         interrupts
     }
+
+    /// External interrupt pending bit check
+    fn update_mip_meip(&mut self, cpu: &mut CPU) {
+        let external_interrupts = *self.pending.borrow();
+        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_mei = if external_interrupts != 0 {
+            mip | (1 << Interrupt::MExternalInterrupt as u32)
+        } else {
+            mip & !(1 << Interrupt::MExternalInterrupt as u32)
+        };
+
+        cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
+    }
 }
 
 impl<'a> TryFrom<&'a Device> for &'a PLIC {
@@ -60,26 +75,13 @@ impl<'a> TryFrom<&'a Device> for &'a PLIC {
     }
 }
 
-impl Clocked<&DeviceMap> for PLIC {
-    // This updates the external interrupts based on the device order. if UART0 is added 3rd then
-    // 0b1000 will denote a pending interrupt on uart0
-    fn tick(&mut self, devices: &DeviceMap) {
-        let mut pending = self.pending.borrow_mut();
-        for (idx, device) in devices.borrow().values().enumerate() {
-            if let Ok(device) = device.try_borrow() {
-                match &*device {
-                    Device::UART(u) => {
-                        let uart_ip = u.get_ip();
-                        let mask = 1 << idx + 1;
-                        if uart_ip != 0 {
-                            *pending |= mask as u64;
-                        } else {
-                            *pending &= !(mask as u64);
-                        };
-                    }
-                    _ => {}
-                }
-            }
+impl Clocked<&mut CPU> for PLIC {
+    fn tick(&mut self, cpu: &mut CPU) {
+        let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
+        let mstatus_mie = (mstatus & (1 << 3)) != 0;
+
+        if mstatus_mie {
+            self.update_mip_meip(cpu);
         }
     }
 }

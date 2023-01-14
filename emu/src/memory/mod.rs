@@ -11,7 +11,7 @@ pub trait Clocked<T> {
     fn tick(&mut self, deps: T);
 }
 
-pub trait ClockedMemory: Clocked<()> + Memory {
+pub trait ClockedMemory<T = ()>: Clocked<T> + Memory {
     fn as_mem(&self) -> &dyn Memory;
     fn as_mut_mem(&mut self) -> &mut dyn Memory;
 }

@@ -1,7 +1,7 @@
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Instruction;
-use crate::instructions::{Exception, ExceptionInterrupt, Interrupt};
-use crate::memory::{clint::CLINT, plic::PLIC, Clocked, DeviceMeta, Memory, MMU};
+use crate::instructions::{Exception, ExceptionInterrupt};
+use crate::memory::{Clocked, DeviceMeta, Memory, MMU};
 use crate::memory::{Device, DeviceMap};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::collections::BTreeMap;
@@ -67,87 +67,6 @@ impl MCU {
         Ok(v)
     }
 
-    /// Software interrupt pending check
-    fn update_mip_msip(&mut self) {
-        let devices = self.devices.borrow();
-        let clintref = &mut *devices.get("CLINT").unwrap().borrow_mut();
-        let mut clint: &mut CLINT = clintref.try_into().unwrap();
-
-        let software_interrupt = clint.msip0;
-
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_msi = if software_interrupt > 0 {
-            clint.msip0 = 0;
-            mip | (1 << Interrupt::MSoftInterrupt as u32)
-        } else {
-            mip & !(1 << Interrupt::MSoftInterrupt as u32)
-        };
-
-        self.cpu.set_csr(CSRs::mip as u32, mip_msi).unwrap();
-    }
-
-    /// Timer interrupt pending check
-    fn update_mip_mtip(&mut self) {
-        use Interrupt::*;
-        let devices = self.devices.borrow_mut();
-        let clintref = &*devices.get("CLINT").unwrap().borrow();
-        let clint: &CLINT = clintref.try_into().unwrap();
-
-        let cmp_time = clint.mtimecmp;
-
-        let time = clint.mtime;
-
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_mti = if cmp_time != 0 && time >= cmp_time {
-            mip | (1 << MTimerInterrupt as u32)
-        } else {
-            mip & !(1 << MTimerInterrupt as u32)
-        };
-        self.cpu.set_csr(CSRs::mip as u32, mip_mti).unwrap();
-    }
-
-    /// External interrupt pending bit check
-    fn update_mip_meip(&mut self) {
-        let devices = self.devices.borrow();
-        let plicref = &*devices.get("PLIC").unwrap().borrow();
-        let plic: &PLIC = plicref.try_into().unwrap();
-        let external_interrupts = *plic.pending.borrow();
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_mei = if external_interrupts != 0 {
-            mip | (1 << Interrupt::MExternalInterrupt as u32)
-        } else {
-            mip & !(1 << Interrupt::MExternalInterrupt as u32)
-        };
-
-        self.cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
-    }
-
-    fn get_interrupt(&mut self) -> Option<Interrupt> {
-        use Interrupt::*;
-        let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
-        let mie_msi = (mie & (1 << MSoftInterrupt as u32)) != 0;
-        let mie_mti = mie & (1 << MTimerInterrupt as u32) != 0;
-        let mie_mei = mie & (1 << MExternalInterrupt as u32) != 0;
-
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_msi = mip & (1 << MSoftInterrupt as u32) != 0;
-        let mip_mti = mip & (1 << MTimerInterrupt as u32) != 0;
-        let mip_mei = mip & (1 << MExternalInterrupt as u32) != 0;
-
-        match mip {
-            // TODO: Handle interrupts for other privilege modes
-            _v if mie_msi && mip_msi => {
-                self.cpu
-                    .set_csr(CSRs::mip as u32, mip & !(1 << MSoftInterrupt as u32))
-                    .unwrap();
-                Some(MSoftInterrupt)
-            }
-            _v if mie_mti && mip_mti => Some(MTimerInterrupt),
-            _v if mie_mei && mip_mei => Some(MExternalInterrupt),
-            _ => None,
-        }
-    }
-
     pub fn tick(&mut self) -> TickResult {
         self.mmu.tick(());
         {
@@ -155,9 +74,9 @@ impl MCU {
             for (_k, device) in devices.iter() {
                 let deviceref = &mut *device.borrow_mut();
                 match deviceref {
-                    Device::PLIC(p) => p.tick(&self.devices),
-                    Device::CLINT(c) => c.tick(()),
-                    Device::UART(u) => u.tick(()),
+                    Device::UART(u) => u.tick((&self.devices, &mut self.cpu)),
+                    Device::PLIC(p) => p.tick(&mut self.cpu),
+                    Device::CLINT(c) => c.tick(&mut self.cpu),
                     Device::FLASH(_f) => {}
                 }
             }
@@ -169,10 +88,7 @@ impl MCU {
 
         let mut interrupt = None;
         if mstatus_mie {
-            self.update_mip_msip();
-            self.update_mip_mtip();
-            self.update_mip_meip();
-            interrupt = self.get_interrupt();
+            interrupt = self.cpu.get_interrupt();
         }
 
         if let Some(exc) = interrupt {
@@ -201,34 +117,19 @@ impl MCU {
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
         let mstatus_mie = mstatus & (1 << 3);
         let mie = self.cpu.get_csr(CSRs::mie as u32).unwrap();
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
 
         let _mcause = match exc {
             ExceptionInterrupt::Interrupt(i) => {
                 self.cpu.wfi = false;
-                if mstatus_mie != 0 && (mie & (1 << i as u32) != 0) {
+                let cause = 1 << i as u32;
+                if mstatus_mie != 0 && (mie & cause != 0) {
                     self.cpu
-                        .set_csr(CSRs::mcause as u32, i as u32 | (1 << 31))
-                        .unwrap();
-                    if i == Interrupt::MExternalInterrupt {
-                        // XXX: For external interrupts, this implementation resets the PLIC pending
-                        // bit, and sets the interrupt value to mtval which may not be the correct vehaviour.
-                        let devices = self.devices.borrow();
-                        let plicref = &*devices.get("PLIC").unwrap().borrow();
-                        let plic: &PLIC = plicref.try_into().unwrap();
-
-                        let plic_int = plic.claim_interrupt();
-                        self.cpu.set_csr(CSRs::mtval as u32, plic_int).unwrap();
-                    }
-                    // XXX: This implementation reset the pending interrupt bit before the handler
-                    // executes it, I'm not sure this is the correct behaviour
-                    self.cpu
-                        .set_csr(CSRs::mip as u32, mip & !(i as u32))
+                        .set_csr(CSRs::mcause as u32, cause | (1 << 31))
                         .unwrap();
                 } else {
                     return TickResult::Cycles(4);
                 };
-                i as u32
+                cause
             }
             ExceptionInterrupt::Exception(e) => {
                 match e {

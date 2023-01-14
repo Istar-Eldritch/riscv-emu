@@ -28,7 +28,17 @@ fn mret(cpu: &mut CPU, _parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
     // TODO Set MPP privilege mode.
     let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
     let mstatus = mstatus | ((mstatus & (1 << 7)) >> 4); // recover mie from mpie
-    let mstatus = mstatus | 1 << 7; // set mpie to
+    let mstatus = mstatus | 1 << 7; // set mpie to 1
+
+    // Reset mip bit
+    // XXX: Not sure if this is the right place to be doing this
+    let mcause = cpu.get_csr(CSRs::mcause as u32).unwrap();
+    if mcause & (1 << 31) > 0 {
+        let cause = mcause & !(1 << 31);
+        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
+        cpu.set_csr(CSRs::mip as u32, mip & !(cause)).unwrap();
+    }
+
     cpu.set_csr(CSRs::mstatus as u32, mstatus).unwrap();
     Ok(1)
 }

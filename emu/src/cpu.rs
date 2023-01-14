@@ -1,4 +1,4 @@
-use crate::instructions::Exception;
+use crate::instructions::{Exception, Interrupt};
 
 pub struct CPU {
     // program counter
@@ -80,6 +80,33 @@ impl CPU {
     pub fn set_x(&mut self, idx: u32, val: u32) {
         if idx > 0 {
             self.x[idx as usize] = val;
+        }
+    }
+
+    /// Checks the mie and mip CSRs, if there are pending interrupts. Map them to a value of the
+    /// [`Interrupt`] enum
+    pub fn get_interrupt(&mut self) -> Option<Interrupt> {
+        use Interrupt::*;
+        let mie = self.get_csr(CSRs::mie as u32).unwrap();
+        let mie_msi = (mie & (1 << MSoftInterrupt as u32)) != 0;
+        let mie_mti = mie & (1 << MTimerInterrupt as u32) != 0;
+        let mie_mei = mie & (1 << MExternalInterrupt as u32) != 0;
+
+        let mip = self.get_csr(CSRs::mip as u32).unwrap();
+        let mip_msi = mip & (1 << MSoftInterrupt as u32) != 0;
+        let mip_mti = mip & (1 << MTimerInterrupt as u32) != 0;
+        let mip_mei = mip & (1 << MExternalInterrupt as u32) != 0;
+
+        match mip {
+            // TODO: Handle interrupts for other privilege modes
+            _v if mie_msi && mip_msi => {
+                self.set_csr(CSRs::mip as u32, mip & !(1 << MSoftInterrupt as u32))
+                    .unwrap();
+                Some(MSoftInterrupt)
+            }
+            _v if mie_mti && mip_mti => Some(MTimerInterrupt),
+            _v if mie_mei && mip_mei => Some(MExternalInterrupt),
+            _ => None,
         }
     }
 }
