@@ -2,7 +2,7 @@ use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
-use crate::peripherals::Peripheral;
+use crate::peripherals::{Peripheral, RegisterInterrupt};
 use std::cell::RefCell;
 
 pub struct PLIC {
@@ -66,26 +66,19 @@ impl PLIC {
     }
 }
 
-impl<'a> TryFrom<&'a Peripheral> for &'a PLIC {
-    type Error = ();
-    fn try_from(device: &Peripheral) -> Result<&PLIC, Self::Error> {
-        match device {
-            Peripheral::PLIC(p) => Ok(p),
-            _ => Err(()),
-        }
+impl Clocked<RegisterInterrupt> for PLIC {
+    fn tick(&mut self, _register_interrupt: RegisterInterrupt) {
+        //TODO Register interrupts
+        //let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
+        //let mstatus_mie = (mstatus & (1 << 3)) != 0;
+
+        //if mstatus_mie {
+        //    self.update_mip_meip(cpu);
+        //}
     }
 }
 
-impl Clocked<&mut CPU> for PLIC {
-    fn tick(&mut self, cpu: &mut CPU) {
-        let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
-        let mstatus_mie = (mstatus & (1 << 3)) != 0;
-
-        if mstatus_mie {
-            self.update_mip_meip(cpu);
-        }
-    }
-}
+impl Peripheral for PLIC {}
 
 impl Memory for PLIC {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {

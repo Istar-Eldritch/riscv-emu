@@ -2,7 +2,7 @@ use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
-use crate::peripherals::Peripheral;
+use crate::peripherals::{Peripheral, RegisterInterrupt};
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -52,38 +52,21 @@ impl CLINT {
     }
 }
 
-impl<'a> TryFrom<&'a Peripheral> for &'a CLINT {
-    type Error = ();
-    fn try_from(device: &Peripheral) -> Result<&CLINT, Self::Error> {
-        match device {
-            Peripheral::CLINT(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
+impl Peripheral for CLINT {}
 
-impl<'a> TryFrom<&'a mut Peripheral> for &'a mut CLINT {
-    type Error = ();
-    fn try_from(device: &mut Peripheral) -> Result<&mut CLINT, Self::Error> {
-        match device {
-            Peripheral::CLINT(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Clocked<&mut CPU> for CLINT {
+impl Clocked<RegisterInterrupt> for CLINT {
     /// Increases time, generates timer & software interrupts
-    fn tick(&mut self, cpu: &mut CPU) -> () {
+    fn tick(&mut self, register_interrupt: RegisterInterrupt) -> () {
         self.mtime += 1;
 
+        // TODO: Register interrupts
         // Generate timer & software interrupts
-        let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
-        let mstatus_mie = (mstatus & (1 << 3)) != 0;
-        if mstatus_mie {
-            self.update_mip_mtip(cpu);
-            self.update_mip_msip(cpu);
-        }
+        // let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
+        // let mstatus_mie = (mstatus & (1 << 3)) != 0;
+        // if mstatus_mie {
+        //     self.update_mip_mtip(cpu);
+        //     self.update_mip_msip(cpu);
+        // }
     }
 }
 

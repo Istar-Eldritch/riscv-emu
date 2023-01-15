@@ -11,7 +11,7 @@ pub struct DeviceDef {
     pub identifier: String,
     pub memory_start: u32,
     pub memory_end: u32,
-    pub device: Peripheral,
+    pub device: Box<dyn Peripheral>,
 }
 
 // Micro controller unit
@@ -74,12 +74,9 @@ impl MCU {
             let devices = self.devices.borrow();
             for (_k, device) in devices.iter() {
                 let deviceref = &mut *device.borrow_mut();
-                match deviceref {
-                    Peripheral::UART(u) => u.tick((&self.devices, &mut self.cpu)),
-                    Peripheral::PLIC(p) => p.tick(&mut self.cpu),
-                    Peripheral::CLINT(c) => c.tick(&mut self.cpu),
-                    Peripheral::FLASH(_f) => {}
-                }
+                deviceref.tick(|_int_type, _id|
+                   // TODO: register the interrupt with the cpu
+                   todo!());
             }
         }
         let pc = self.cpu.pc;

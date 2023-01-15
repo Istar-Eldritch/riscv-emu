@@ -42,5 +42,5 @@ pub trait Memory {
 }
 
 pub type DeviceMap = std::rc::Rc<
-    std::cell::RefCell<std::collections::BTreeMap<String, std::cell::RefCell<Peripheral>>>,
+    std::cell::RefCell<std::collections::BTreeMap<String, std::cell::RefCell<Box<dyn Peripheral>>>>,
 >;

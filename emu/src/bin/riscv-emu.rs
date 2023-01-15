@@ -1,8 +1,7 @@
 use clap::{command, Parser};
 use riscv_emu::emulator::{Emulator, EmulatorOpts};
 use riscv_emu::mcu::DeviceDef;
-use riscv_emu::memory::GenericMemory;
-use riscv_emu::peripherals::{clint::CLINT, plic::PLIC, uart::UART, Peripheral};
+use riscv_emu::peripherals::{clint::CLINT, flash::Flash, plic::PLIC, uart::UART};
 use riscv_emu::terminal::TermEmulator;
 use std::fs;
 use std::io::{BufReader, Read};
@@ -61,25 +60,25 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             identifier: "FLASH".to_string(),
             memory_start: 0,
             memory_end: 0x3_2000,
-            device: Peripheral::FLASH(GenericMemory::new(0x3_2000)),
+            device: Box::new(Flash::new(0x3_2000)),
         },
         DeviceDef {
             identifier: "CLINT".to_string(),
             memory_start: 0x200_0000,
             memory_end: 0x200_FFFF,
-            device: Peripheral::CLINT(CLINT::new()),
+            device: Box::new(CLINT::new()),
         },
         DeviceDef {
             identifier: "PLIC".to_string(),
             memory_start: 0x0C00_0000,
             memory_end: 0x1000_0000,
-            device: Peripheral::PLIC(PLIC::new()),
+            device: Box::new(PLIC::new()),
         },
         DeviceDef {
             identifier: "UART0".to_string(),
             memory_start: 0x1001_3000,
             memory_end: 0x1001_3FFF,
-            device: Peripheral::UART(uart_device),
+            device: Box::new(uart_device),
         },
     ];
 
