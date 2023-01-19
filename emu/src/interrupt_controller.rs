@@ -34,12 +34,13 @@ impl InterruptController {
                         let mut pending = plic.pending.borrow_mut();
                         *pending |= id as u64;
                         self.interrupts.push(interrupt);
+                        return;
                     }
                 }
             }
-        } else {
-            self.interrupts.push(interrupt)
         }
+
+        self.interrupts.push(interrupt)
     }
 
     fn highest_priority_interrupt(&self) -> Option<Interrupt> {
