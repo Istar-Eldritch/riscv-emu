@@ -1,5 +1,5 @@
 use super::{Exception, ExceptionInterrupt, Instruction};
-use crate::cpu::CPU;
+use crate::mcu::MCU;
 use crate::memory::Memory;
 use crate::utils::*;
 use riscv_isa_types::format::*;
@@ -9,61 +9,61 @@ use Exception::*;
 use ExceptionInterrupt::*;
 
 impl Instruction for RV32i {
-    fn execute(&self, cpu: &mut CPU, mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt> {
+    fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt> {
         use RV32i::*;
         match *self {
-            LUI(f) => lui(cpu, mem, f),
-            AUIPC(f) => auipc(cpu, mem, f),
-            JAL(f) => jal(cpu, mem, f),
-            JALR(f) => jalr(cpu, mem, f),
-            BEQ(f) => beq(cpu, mem, f),
-            BNE(f) => bne(cpu, mem, f),
-            BLT(f) => blt(cpu, mem, f),
-            BGE(f) => bge(cpu, mem, f),
-            BLTU(f) => bltu(cpu, mem, f),
-            BGEU(f) => bgeu(cpu, mem, f),
-            LB(f) => lb(cpu, mem, f),
-            LH(f) => lh(cpu, mem, f),
-            LW(f) => lw(cpu, mem, f),
-            LBU(f) => lbu(cpu, mem, f),
-            LHU(f) => lhu(cpu, mem, f),
-            LWU(f) => lwu(cpu, mem, f),
-            SB(f) => sb(cpu, mem, f),
-            SH(f) => sh(cpu, mem, f),
-            SW(f) => sw(cpu, mem, f),
-            ADDI(f) => addi(cpu, mem, f),
-            SLTI(f) => slti(cpu, mem, f),
-            SLTIU(f) => sltiu(cpu, mem, f),
-            XORI(f) => xori(cpu, mem, f),
-            ORI(f) => ori(cpu, mem, f),
-            ANDI(f) => andi(cpu, mem, f),
-            SLLI(f) => slli(cpu, mem, f),
-            SRLI(f) => srli(cpu, mem, f),
-            SRAI(f) => srai(cpu, mem, f),
-            ADD(f) => add(cpu, mem, f),
-            SUB(f) => sub(cpu, mem, f),
-            SLL(f) => sll(cpu, mem, f),
-            SLT(f) => slt(cpu, mem, f),
-            SLTU(f) => sltu(cpu, mem, f),
-            XOR(f) => xor(cpu, mem, f),
-            SRL(f) => srl(cpu, mem, f),
-            SRA(f) => sra(cpu, mem, f),
-            OR(f) => or(cpu, mem, f),
-            AND(f) => and(cpu, mem, f),
-            FENCE(f) => fence(cpu, mem, f),
-            FENCEI(f) => fence(cpu, mem, f),
-            ECALL(f) => ecall(cpu, mem, f),
-            EBREAK(f) => ebreak(cpu, mem, f),
-            CSRRW(f) => csrrw(cpu, mem, f),
-            CSRRS(f) => csrrs(cpu, mem, f),
-            CSRRC(f) => csrrc(cpu, mem, f),
-            CSRRWI(f) => csrrwi(cpu, mem, f),
-            CSRRSI(f) => csrrsi(cpu, mem, f),
-            CSRRCI(f) => csrrci(cpu, mem, f),
+            LUI(f) => lui(mcu, f),
+            AUIPC(f) => auipc(mcu, f),
+            JAL(f) => jal(mcu, f),
+            JALR(f) => jalr(mcu, f),
+            BEQ(f) => beq(mcu, f),
+            BNE(f) => bne(mcu, f),
+            BLT(f) => blt(mcu, f),
+            BGE(f) => bge(mcu, f),
+            BLTU(f) => bltu(mcu, f),
+            BGEU(f) => bgeu(mcu, f),
+            LB(f) => lb(mcu, f),
+            LH(f) => lh(mcu, f),
+            LW(f) => lw(mcu, f),
+            LBU(f) => lbu(mcu, f),
+            LHU(f) => lhu(mcu, f),
+            LWU(f) => lwu(mcu, f),
+            SB(f) => sb(mcu, f),
+            SH(f) => sh(mcu, f),
+            SW(f) => sw(mcu, f),
+            ADDI(f) => addi(mcu, f),
+            SLTI(f) => slti(mcu, f),
+            SLTIU(f) => sltiu(mcu, f),
+            XORI(f) => xori(mcu, f),
+            ORI(f) => ori(mcu, f),
+            ANDI(f) => andi(mcu, f),
+            SLLI(f) => slli(mcu, f),
+            SRLI(f) => srli(mcu, f),
+            SRAI(f) => srai(mcu, f),
+            ADD(f) => add(mcu, f),
+            SUB(f) => sub(mcu, f),
+            SLL(f) => sll(mcu, f),
+            SLT(f) => slt(mcu, f),
+            SLTU(f) => sltu(mcu, f),
+            XOR(f) => xor(mcu, f),
+            SRL(f) => srl(mcu, f),
+            SRA(f) => sra(mcu, f),
+            OR(f) => or(mcu, f),
+            AND(f) => and(mcu, f),
+            FENCE(f) => fence(mcu, f),
+            FENCEI(f) => fence(mcu, f),
+            ECALL(f) => ecall(mcu, f),
+            EBREAK(f) => ebreak(mcu, f),
+            CSRRW(f) => csrrw(mcu, f),
+            CSRRS(f) => csrrs(mcu, f),
+            CSRRC(f) => csrrc(mcu, f),
+            CSRRWI(f) => csrrwi(mcu, f),
+            CSRRSI(f) => csrrsi(mcu, f),
+            CSRRCI(f) => csrrci(mcu, f),
         }
     }
 
-    fn update_pc(&self, cpu: &mut CPU) {
+    fn update_pc(&self, mcu: &mut MCU) {
         use RV32i::*;
         match *self {
             JAL(_) => (),
@@ -74,144 +74,139 @@ impl Instruction for RV32i {
             BGE(_) => (),
             BLTU(_) => (),
             BGEU(_) => (),
-            _ => cpu.pc += 4,
+            _ => mcu.cpu.pc += 4,
         }
     }
 }
 
-fn ecall(
-    _cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    _parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
+fn ecall(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     // TODO: Environemnt calls on other privilege modes
     Err(ExceptionInterrupt::Exception(Exception::MEnvironmentCall))
 }
 
-fn ebreak(
-    _cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    _parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
+fn ebreak(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     Err(ExceptionInterrupt::Exception(Exception::Breakpoint))
 }
 
 /// Load Upper Immediate
-fn lui(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, sext(parsed.imm << 12, 32, 32));
+fn lui(mcu: &mut MCU, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(parsed.rd, sext(parsed.imm << 12, 32, 32));
     Ok(1)
 }
 
 /// Add Upper Immediate to PC
-fn auipc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn auipc(mcu: &mut MCU, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        ((cpu.pc as i32) + (sext(parsed.imm << 12, 32, 32)) as i32) as u32,
+        ((mcu.cpu.pc as i32) + (sext(parsed.imm << 12, 32, 32)) as i32) as u32,
     );
     Ok(1)
 }
 
 /// Jump and Link
-fn jal(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: JFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.pc + 4);
+fn jal(mcu: &mut MCU, parsed: JFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(parsed.rd, mcu.cpu.pc + 4);
     let offset =
         (parsed.imm0 << 12) | (parsed.imm1 << 11) | (parsed.imm2 << 1) | (parsed.imm3 << 20);
-    cpu.pc = (cpu.pc as i32 + (sext(offset, 20, 32) as i32)) as u32;
+    mcu.cpu.pc = (mcu.cpu.pc as i32 + (sext(offset, 20, 32) as i32)) as u32;
     Ok(1)
 }
 
 /// Jump and Link Register
-fn jalr(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let t = cpu.get_x(parsed.rs1);
-    cpu.set_x(parsed.rd, cpu.pc + 4);
-    cpu.pc = (((t as i32) + (sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
+fn jalr(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = mcu.cpu.get_x(parsed.rs1);
+    mcu.cpu.set_x(parsed.rd, mcu.cpu.pc + 4);
+    mcu.cpu.pc = (((t as i32) + (sext(parsed.imm, 12, 32) as i32)) & !(0b1 as i32)) as u32;
     Ok(1)
 }
 
-fn beq(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.get_x(parsed.rs1) == cpu.get_x(parsed.rs2) {
+fn beq(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if mcu.cpu.get_x(parsed.rs1) == mcu.cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
-fn bge(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.get_x(parsed.rs1) as i32 >= cpu.get_x(parsed.rs2) as i32 {
+fn bge(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if mcu.cpu.get_x(parsed.rs1) as i32 >= mcu.cpu.get_x(parsed.rs2) as i32 {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
-fn bgeu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.get_x(parsed.rs1) >= cpu.get_x(parsed.rs2) {
+fn bgeu(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if mcu.cpu.get_x(parsed.rs1) >= mcu.cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
-fn blt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if (cpu.get_x(parsed.rs1) as i32) < (cpu.get_x(parsed.rs2) as i32) {
+fn blt(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if (mcu.cpu.get_x(parsed.rs1) as i32) < (mcu.cpu.get_x(parsed.rs2) as i32) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
-fn bltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.get_x(parsed.rs1) < cpu.get_x(parsed.rs2) {
+fn bltu(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if mcu.cpu.get_x(parsed.rs1) < mcu.cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
-fn bne(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
-    if cpu.get_x(parsed.rs1) != cpu.get_x(parsed.rs2) {
+fn bne(mcu: &mut MCU, parsed: BFormat) -> Result<u32, ExceptionInterrupt> {
+    if mcu.cpu.get_x(parsed.rs1) != mcu.cpu.get_x(parsed.rs2) {
         let offset = parsed.imm0 << 11 | parsed.imm1 << 1 | parsed.imm2 << 5 | parsed.imm3 << 12;
-        cpu.pc = (cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+        mcu.cpu.pc = (mcu.cpu.pc as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
     } else {
-        cpu.pc += 4;
+        mcu.cpu.pc += 4;
     }
     Ok(1)
 }
 
 /// Branch parsing
 
-fn lb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
-    let byte = mem.rb(addr).map_err(|_| Exception(LoadAccessFault))?;
-    cpu.set_x(parsed.rd, sext(byte as u32, 8, 32));
+fn lb(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr =
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    let byte = mcu.mmu.rb(addr).map_err(|_| Exception(LoadAccessFault))?;
+    mcu.cpu.set_x(parsed.rd, sext(byte as u32, 8, 32));
     Ok(1)
 }
 
-fn lbu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
-    cpu.set_x(
+fn lbu(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr =
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    mcu.cpu.set_x(
         parsed.rd,
-        mem.rb(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+        mcu.mmu.rb(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
     );
     Ok(1)
 }
 
-fn lh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
-    cpu.set_x(
+fn lh(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr =
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    mcu.cpu.set_x(
         parsed.rd,
         sext(
-            mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+            mcu.mmu.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
             16,
             32,
         ),
@@ -219,311 +214,330 @@ fn lh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, Excep
     Ok(1)
 }
 
-fn lhu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
-    cpu.set_x(
+fn lhu(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr =
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    mcu.cpu.set_x(
         parsed.rd,
-        mem.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+        mcu.mmu.rhw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
     );
     Ok(1)
 }
 
-fn lw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = ((cpu.get_x(parsed.rs1) as i32) + (sext(parsed.imm, 12, 32) as i32)) as u32;
-    cpu.set_x(
+fn lw(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr = ((mcu.cpu.get_x(parsed.rs1) as i32) + (sext(parsed.imm, 12, 32) as i32)) as u32;
+    mcu.cpu.set_x(
         parsed.rd,
-        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))?,
+        mcu.mmu.rw(addr).map_err(|_| Exception(LoadAccessFault))?,
     );
     Ok(1)
 }
 
-fn lwu(cpu: &mut CPU, mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
-    cpu.set_x(
+fn lwu(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let addr =
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32;
+    mcu.cpu.set_x(
         parsed.rd,
-        mem.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
+        mcu.mmu.rw(addr).map_err(|_| Exception(LoadAccessFault))? as u32,
     );
     Ok(1)
 }
 
-fn sb(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
+fn sb(mcu: &mut MCU, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let offset = parsed.imm0 | (parsed.imm1 << 5);
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
-    mem.wb(addr, cpu.get_x(parsed.rs2) as u8)
+    let addr = (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    mcu.mmu
+        .wb(addr, mcu.cpu.get_x(parsed.rs2) as u8)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
-fn sh(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
+fn sh(mcu: &mut MCU, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let offset = parsed.imm0 | (parsed.imm1 << 5);
-    let addr = (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
-    mem.whw(addr, cpu.get_x(parsed.rs2) as u16)
+    let addr = (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(offset, 12, 32) as i32) as u32;
+    mcu.mmu
+        .whw(addr, mcu.cpu.get_x(parsed.rs2) as u16)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
-fn sw(cpu: &mut CPU, mem: &mut dyn Memory, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
+fn sw(mcu: &mut MCU, parsed: SFormat) -> Result<u32, ExceptionInterrupt> {
     let offset = parsed.imm0 | (parsed.imm1 << 5);
-    let addr = ((cpu.get_x(parsed.rs1) as i32) + (sext(offset, 12, 32) as i32)) as u32;
-    let value = cpu.get_x(parsed.rs2);
-    mem.ww(addr, value)
+    let addr = ((mcu.cpu.get_x(parsed.rs1) as i32) + (sext(offset, 12, 32) as i32)) as u32;
+    let value = mcu.cpu.get_x(parsed.rs2);
+    mcu.mmu
+        .ww(addr, value)
         .map_err(|_| Exception(StoreAccessFault))?;
     Ok(1)
 }
 
-fn addi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn addi(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        (cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32,
+        (mcu.cpu.get_x(parsed.rs1) as i32).wrapping_add(sext(parsed.imm, 12, 32) as i32) as u32,
     );
     Ok(1)
 }
 
-fn slti(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if (cpu.get_x(parsed.rs1) as i32) < sext(parsed.imm, 12, 32) as i32 {
+fn slti(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let v = if (mcu.cpu.get_x(parsed.rs1) as i32) < sext(parsed.imm, 12, 32) as i32 {
         1
     } else {
         0
     };
 
-    cpu.set_x(parsed.rd, v);
+    mcu.cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
-fn sltiu(
-    cpu: &mut CPU,
-    __mem: &mut dyn Memory,
-    parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
-    let v = if cpu.get_x(parsed.rs1) < sext(parsed.imm, 12, 32) {
+fn sltiu(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let v = if mcu.cpu.get_x(parsed.rs1) < sext(parsed.imm, 12, 32) {
         1
     } else {
         0
     };
 
-    cpu.set_x(parsed.rd, v);
+    mcu.cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
-fn xori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) ^ sext(parsed.imm, 12, 32));
+fn xori(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu.get_x(parsed.rs1) ^ sext(parsed.imm, 12, 32),
+    );
     Ok(1)
 }
 
-fn ori(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) | sext(parsed.imm, 12, 32));
+fn ori(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu.get_x(parsed.rs1) | sext(parsed.imm, 12, 32),
+    );
     Ok(1)
 }
 
-fn andi(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) & sext(parsed.imm, 12, 32));
+fn andi(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu.get_x(parsed.rs1) & sext(parsed.imm, 12, 32),
+    );
     Ok(1)
 }
 
-fn slli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+fn slli(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1).wrapping_shl(shamt));
+    mcu.cpu
+        .set_x(parsed.rd, mcu.cpu.get_x(parsed.rs1).wrapping_shl(shamt));
     Ok(1)
 }
 
-fn srli(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+fn srli(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
     // TODO: shamt[5] should be 0, otherwise is an illegal instruction
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1).wrapping_shr(shamt));
+    mcu.cpu
+        .set_x(parsed.rd, mcu.cpu.get_x(parsed.rs1).wrapping_shr(shamt));
     Ok(1)
 }
 
-fn srai(cpu: &mut CPU, __mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+fn srai(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     let shamt = parsed.imm & 0b11111;
     if shamt & 0b100000 != 0 {
         return Err(ExceptionInterrupt::Exception(Exception::IllegalInstruction));
     }
 
-    let rs1 = cpu.get_x(parsed.rs1);
-    cpu.set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
+    let rs1 = mcu.cpu.get_x(parsed.rs1);
+    mcu.cpu
+        .set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
     Ok(1)
 }
 
-fn add(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn add(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        cpu.get_x(parsed.rs1).wrapping_add(cpu.get_x(parsed.rs2)),
+        mcu.cpu
+            .get_x(parsed.rs1)
+            .wrapping_add(mcu.cpu.get_x(parsed.rs2)),
     );
     Ok(1)
 }
 
-fn sub(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn sub(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        cpu.get_x(parsed.rs1).wrapping_sub(cpu.get_x(parsed.rs2)),
+        mcu.cpu
+            .get_x(parsed.rs1)
+            .wrapping_sub(mcu.cpu.get_x(parsed.rs2)),
     );
     Ok(1)
 }
 
-fn sll(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn sll(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        cpu.get_x(parsed.rs1)
-            .wrapping_shl(cpu.get_x(parsed.rs2) & 0b11111),
+        mcu.cpu
+            .get_x(parsed.rs1)
+            .wrapping_shl(mcu.cpu.get_x(parsed.rs2) & 0b11111),
     );
     Ok(1)
 }
 
-fn slt(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if (cpu.get_x(parsed.rs1) as i32) < cpu.get_x(parsed.rs2) as i32 {
+fn slt(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    let v = if (mcu.cpu.get_x(parsed.rs1) as i32) < mcu.cpu.get_x(parsed.rs2) as i32 {
         1
     } else {
         0
     };
 
-    cpu.set_x(parsed.rd, v);
+    mcu.cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
-fn sltu(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let v = if cpu.get_x(parsed.rs1) < cpu.get_x(parsed.rs2) {
+fn sltu(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    let v = if mcu.cpu.get_x(parsed.rs1) < mcu.cpu.get_x(parsed.rs2) {
         1
     } else {
         0
     };
 
-    cpu.set_x(parsed.rd, v);
+    mcu.cpu.set_x(parsed.rd, v);
     Ok(1)
 }
 
-fn xor(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) ^ cpu.get_x(parsed.rs2));
-    Ok(1)
-}
-
-fn srl(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn xor(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        cpu.get_x(parsed.rs1)
-            .wrapping_shr(cpu.get_x(parsed.rs2) & 0b11111),
+        mcu.cpu.get_x(parsed.rs1) ^ mcu.cpu.get_x(parsed.rs2),
     );
     Ok(1)
 }
 
-fn sra(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    let shamt = cpu.get_x(parsed.rs2) & 0b11111;
-    let rs1 = cpu.get_x(parsed.rs1);
-    cpu.set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
+fn srl(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu
+            .get_x(parsed.rs1)
+            .wrapping_shr(mcu.cpu.get_x(parsed.rs2) & 0b11111),
+    );
     Ok(1)
 }
 
-fn or(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) | cpu.get_x(parsed.rs2));
+fn sra(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    let shamt = mcu.cpu.get_x(parsed.rs2) & 0b11111;
+    let rs1 = mcu.cpu.get_x(parsed.rs1);
+    mcu.cpu
+        .set_x(parsed.rd, (rs1 as i32).wrapping_shr(shamt) as u32);
     Ok(1)
 }
 
-fn and(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(parsed.rd, cpu.get_x(parsed.rs1) & cpu.get_x(parsed.rs2));
+fn or(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu.get_x(parsed.rs1) | mcu.cpu.get_x(parsed.rs2),
+    );
     Ok(1)
 }
 
-fn fence(
-    _cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    _parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
+fn and(mcu: &mut MCU, parsed: RFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
+        parsed.rd,
+        mcu.cpu.get_x(parsed.rs1) & mcu.cpu.get_x(parsed.rs2),
+    );
+    Ok(1)
+}
+
+fn fence(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     Ok(0)
 }
 
-fn csrrw(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let t = match cpu.get_csr(parsed.imm) {
+fn csrrw(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = match mcu.cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1)) {
+    match mcu.cpu.set_csr(parsed.imm, mcu.cpu.get_x(parsed.rs1)) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.set_x(parsed.rd, t as u32);
+    mcu.cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
-fn csrrs(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let t = match cpu.get_csr(parsed.imm) {
+fn csrrs(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = match mcu.cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1) | t) {
+    match mcu.cpu.set_csr(parsed.imm, mcu.cpu.get_x(parsed.rs1) | t) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.set_x(parsed.rd, t as u32);
+    mcu.cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
-fn csrrc(cpu: &mut CPU, _mem: &mut dyn Memory, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
-    let t = match cpu.get_csr(parsed.imm) {
+fn csrrc(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = match mcu.cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, t & !cpu.get_x(parsed.rs1)) {
+    match mcu.cpu.set_csr(parsed.imm, t & !mcu.cpu.get_x(parsed.rs1)) {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.set_x(parsed.rd, t as u32);
+    mcu.cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
-fn csrrwi(
-    cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
-    cpu.set_x(
+fn csrrwi(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    mcu.cpu.set_x(
         parsed.rd,
-        match cpu.get_csr(parsed.imm) {
+        match mcu.cpu.get_csr(parsed.imm) {
             Ok(v) => v,
             Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         },
     );
-    match cpu.set_csr(parsed.imm, cpu.get_x(parsed.rs1) & 0b11111) {
+    match mcu
+        .cpu
+        .set_csr(parsed.imm, mcu.cpu.get_x(parsed.rs1) & 0b11111)
+    {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => (),
     };
     Ok(1)
 }
 
-fn csrrsi(
-    cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
-    let t = match cpu.get_csr(parsed.imm) {
+fn csrrsi(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = match mcu.cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => {
             return Err(ExceptionInterrupt::Exception(err));
         }
     };
-    let new_value = cpu.get_x(parsed.rs1) | t;
-    match cpu.set_csr(parsed.imm, new_value) {
+    let new_value = mcu.cpu.get_x(parsed.rs1) | t;
+    match mcu.cpu.set_csr(parsed.imm, new_value) {
         Err(err) => {
             return Err(ExceptionInterrupt::Exception(err));
         }
         _ => {}
     };
-    cpu.set_x(parsed.rd, t as u32);
+    mcu.cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }
 
-fn csrrci(
-    cpu: &mut CPU,
-    _mem: &mut dyn Memory,
-    parsed: IFormat,
-) -> Result<u32, ExceptionInterrupt> {
-    let t = match cpu.get_csr(parsed.imm) {
+fn csrrci(mcu: &mut MCU, parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
+    let t = match mcu.cpu.get_csr(parsed.imm) {
         Ok(v) => v,
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
     };
-    match cpu.set_csr(parsed.imm, t & !(cpu.get_x(parsed.rs1) & 0b11111)) {
+    match mcu
+        .cpu
+        .set_csr(parsed.imm, t & !(mcu.cpu.get_x(parsed.rs1) & 0b11111))
+    {
         Err(err) => return Err(ExceptionInterrupt::Exception(err)),
         _ => {}
     };
-    cpu.set_x(parsed.rd, t as u32);
+    mcu.cpu.set_x(parsed.rd, t as u32);
     Ok(1)
 }

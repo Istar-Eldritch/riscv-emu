@@ -1,4 +1,3 @@
-use crate::instructions::Interrupt;
 use crate::memory::Clocked;
 use crate::memory::Memory;
 use std::any::Any;
@@ -7,21 +6,11 @@ pub mod flash;
 pub mod plic;
 pub mod uart;
 
-type RegisterInterrupt = fn(Interrupt, u32) -> ();
-
-pub trait Peripheral: Clocked<RegisterInterrupt> + Memory + AToAny {}
-
-pub trait AToAny: 'static {
-    fn as_any(&self) -> &dyn Any;
+pub trait Peripheral: Clocked + Memory + Any {
+    fn as_any(&mut self) -> &mut dyn Any;
 }
 
-impl<T: 'static> AToAny for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-struct PeripheralWrapper<T>(T);
+pub struct PeripheralWrapper<T>(T);
 
 impl<T> std::ops::Deref for PeripheralWrapper<T> {
     type Target = T;
@@ -36,10 +25,10 @@ impl<T> std::ops::DerefMut for PeripheralWrapper<T> {
     }
 }
 
-impl<'a, T: 'a> TryFrom<&'a Box<dyn Peripheral + 'a>> for &'a PeripheralWrapper<T> {
+impl<'a, T: 'static> TryFrom<&'a mut dyn Peripheral> for PeripheralWrapper<&'a mut T> {
     type Error = ();
-    fn try_from(p: &'a Box<dyn Peripheral>) -> Result<&'a PeripheralWrapper<T>, Self::Error> {
-        let any: &dyn Any = p.as_any();
-        any.downcast_ref().ok_or(())
+    fn try_from(p: &'a mut dyn Peripheral) -> Result<PeripheralWrapper<&'a mut T>, Self::Error> {
+        let any: &mut dyn Any = p.as_any();
+        any.downcast_mut().map(|v| PeripheralWrapper(v)).ok_or(())
     }
 }

@@ -1,8 +1,9 @@
-use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
+use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
-use crate::peripherals::{Peripheral, RegisterInterrupt};
+use crate::peripherals::Peripheral;
+use std::any::Any;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -18,55 +19,26 @@ impl CLINT {
             mtime: 0,
         }
     }
+}
 
-    /// Software interrupt pending check
-    fn update_mip_msip(&mut self, cpu: &mut CPU) {
-        let software_interrupt = self.msip0;
-
-        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_msi = if software_interrupt > 0 {
-            self.msip0 = 0;
-            mip | (1 << Interrupt::MSoftInterrupt as u32)
-        } else {
-            mip & !(1 << Interrupt::MSoftInterrupt as u32)
-        };
-
-        cpu.set_csr(CSRs::mip as u32, mip_msi).unwrap();
-    }
-
-    /// Timer interrupt pending check
-    fn update_mip_mtip(&mut self, cpu: &mut CPU) {
-        use Interrupt::*;
-
-        let cmp_time = self.mtimecmp;
-
-        let time = self.mtime;
-
-        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_mti = if cmp_time != 0 && time >= cmp_time {
-            mip | (1 << MTimerInterrupt as u32)
-        } else {
-            mip & !(1 << MTimerInterrupt as u32)
-        };
-        cpu.set_csr(CSRs::mip as u32, mip_mti).unwrap();
+impl Peripheral for CLINT {
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
-impl Peripheral for CLINT {}
-
-impl Clocked<RegisterInterrupt> for CLINT {
+impl Clocked for CLINT {
     /// Increases time, generates timer & software interrupts
-    fn tick(&mut self, register_interrupt: RegisterInterrupt) -> () {
+    fn tick(&mut self, int_ctrl: &mut InterruptController) -> () {
         self.mtime += 1;
 
-        // TODO: Register interrupts
-        // Generate timer & software interrupts
-        // let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
-        // let mstatus_mie = (mstatus & (1 << 3)) != 0;
-        // if mstatus_mie {
-        //     self.update_mip_mtip(cpu);
-        //     self.update_mip_msip(cpu);
-        // }
+        if self.mtimecmp != 0 && self.mtime >= self.mtimecmp {
+            int_ctrl.interrupt(Interrupt::MTimerInterrupt, 0)
+        }
+
+        if self.msip0 > 0 {
+            int_ctrl.interrupt(Interrupt::MSoftInterrupt, self.msip0)
+        }
     }
 }
 

@@ -1,17 +1,13 @@
 mod generic;
 mod mapped_memory;
 mod mmu;
+use crate::interrupt_controller::InterruptController;
 use crate::peripherals::Peripheral;
 pub use generic::GenericMemory;
 pub use mmu::*;
 
-pub trait Clocked<T> {
-    fn tick(&mut self, deps: T);
-}
-
-pub trait ClockedMemory<T = ()>: Clocked<T> + Memory {
-    fn as_mem(&self) -> &dyn Memory;
-    fn as_mut_mem(&mut self) -> &mut dyn Memory;
+pub trait Clocked {
+    fn tick(&mut self, interrupt_ctrl: &mut InterruptController);
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]

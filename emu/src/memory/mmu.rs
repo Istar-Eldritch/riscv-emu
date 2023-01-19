@@ -1,4 +1,4 @@
-use super::{Clocked, ClockedMemory, DeviceMap, Memory, MemoryError};
+use super::{DeviceMap, Memory, MemoryError};
 
 #[derive(Debug)]
 pub struct DeviceMeta {
@@ -28,19 +28,6 @@ impl MMU {
             device_idx: Vec::new(),
             devices,
         }
-    }
-}
-
-impl Clocked<()> for MMU {
-    fn tick(&mut self, _: ()) {}
-}
-
-impl ClockedMemory for MMU {
-    fn as_mem(&self) -> &dyn Memory {
-        self
-    }
-    fn as_mut_mem(&mut self) -> &mut dyn Memory {
-        self
     }
 }
 

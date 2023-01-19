@@ -1,6 +1,7 @@
 pub mod cpu;
 pub mod emulator;
 pub mod instructions;
+mod interrupt_controller;
 pub mod mcu;
 pub mod memory;
 pub mod peripherals;

@@ -1,11 +1,15 @@
-use crate::{cpu::CPU, memory::Memory};
+use crate::mcu::MCU;
 pub mod privileged;
 pub mod rv32i;
 
 pub trait Instruction: TryFrom<u32> + Into<u32> {
-    fn execute(&self, cpu: &mut CPU, mem: &mut dyn Memory) -> Result<u32, ExceptionInterrupt>;
-    fn update_pc(&self, cpu: &mut CPU) -> ();
+    fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt>;
+    fn update_pc(&self, mcu: &mut MCU) -> ();
 }
+
+// external
+// software
+// timer
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Interrupt {

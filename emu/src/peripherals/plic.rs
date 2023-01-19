@@ -1,16 +1,17 @@
-use crate::cpu::{CSRs, CPU};
-use crate::instructions::Interrupt;
+use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
-use crate::peripherals::{Peripheral, RegisterInterrupt};
+use crate::peripherals::Peripheral;
+use std::any::Any;
 use std::cell::RefCell;
 
 pub struct PLIC {
     pub source_priority: [u32; 52], // addr 0x0
     pub pending: RefCell<u64>,      // addr 0xd0
-    pub h0mie: u64,                 // hart0 M-Mode interrupt enables - addr 216
-    pub h0mpt: u32,                 // hart0 M-Mode priority threshold - addr 224
-                                    // hart0 M-Mode claim/complete - addr 228
+    // TODO: This should be an array with a touple per hart so this would work with multiple cores
+    pub h0mie: u64, // hart0 M-Mode interrupt enables - addr 216
+    pub h0mpt: u32, // hart0 M-Mode priority threshold - addr 224
+                    // hart0 M-Mode claim/complete - addr 228
 }
 
 impl PLIC {
@@ -32,7 +33,7 @@ impl PLIC {
     }
 
     // Returns the enabled and pending interrupts ordered by priority
-    fn get_interrupts(&self) -> Vec<u32> {
+    pub fn get_interrupts(&self) -> Vec<u32> {
         let mut interrupts = Vec::new();
         for i in 0..52 {
             let code = 1 << i;
@@ -51,34 +52,17 @@ impl PLIC {
         });
         interrupts
     }
-
-    /// External interrupt pending bit check
-    fn update_mip_meip(&mut self, cpu: &mut CPU) {
-        let external_interrupts = *self.pending.borrow();
-        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_mei = if external_interrupts != 0 {
-            mip | (1 << Interrupt::MExternalInterrupt as u32)
-        } else {
-            mip & !(1 << Interrupt::MExternalInterrupt as u32)
-        };
-
-        cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
-    }
 }
 
-impl Clocked<RegisterInterrupt> for PLIC {
-    fn tick(&mut self, _register_interrupt: RegisterInterrupt) {
-        //TODO Register interrupts
-        //let mstatus = cpu.get_csr(CSRs::mstatus as u32).unwrap();
-        //let mstatus_mie = (mstatus & (1 << 3)) != 0;
-
-        //if mstatus_mie {
-        //    self.update_mip_meip(cpu);
-        //}
-    }
+impl Clocked for PLIC {
+    fn tick(&mut self, _mcu: &mut InterruptController) {}
 }
 
-impl Peripheral for PLIC {}
+impl Peripheral for PLIC {
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
+    }
+}
 
 impl Memory for PLIC {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {

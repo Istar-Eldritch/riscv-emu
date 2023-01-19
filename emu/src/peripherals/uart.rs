@@ -1,7 +1,9 @@
 use crate::instructions::Interrupt;
+use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
-use crate::peripherals::{Peripheral, RegisterInterrupt};
+use crate::peripherals::Peripheral;
+use std::any::Any;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
@@ -59,8 +61,8 @@ impl UART {
     }
 }
 
-impl Clocked<RegisterInterrupt> for UART {
-    fn tick(&mut self, register_interrupt: RegisterInterrupt) -> () {
+impl Clocked for UART {
+    fn tick(&mut self, int_ctrl: &mut InterruptController) -> () {
         let mut r_fifo = self.r_fifo.borrow_mut();
         if let Some(device) = &mut self.device {
             // rxen = 1
@@ -95,32 +97,16 @@ impl Clocked<RegisterInterrupt> for UART {
         let uart_ip = self.get_ip();
 
         if uart_ip != 0 {
-            register_interrupt(Interrupt::MExternalInterrupt, self.interrupt_id)
+            int_ctrl.interrupt(Interrupt::MExternalInterrupt, self.interrupt_id)
         }
-        // If the PLIC is present, update interrupt through the it, otherwise do it directly
-        //if let Some(Ok(device)) = devices.borrow().get("PLIC").map(|d| d.try_borrow()) {
-        //    if let Peripheral::PLIC(plic) = &*device {
-        //        let mut pending = plic.pending.borrow_mut();
-        //        if uart_ip != 0 {
-        //            *pending |= self.interrupt_id as u64;
-        //        } else {
-        //            *pending &= !(self.interrupt_id as u64);
-        //        }
-        //    }
-        //    // Should we panic here? It would mean the device identified as PLIC is not a plic
-        //} else {
-        //    let mie = cpu.get_csr(CSRs::mie as u32).unwrap()
-        //        & (1 << Interrupt::MExternalInterrupt as u32);
-        //    if uart_ip != 0 && mie != 0 {
-        //        let mip = cpu.get_csr(CSRs::mip as u32).unwrap();
-        //        let mip_mei = mip | (1 << Interrupt::MExternalInterrupt as u32);
-        //        cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
-        //    }
-        //}
     }
 }
 
-impl Peripheral for UART {}
+impl Peripheral for UART {
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
+    }
+}
 
 impl Memory for UART {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {

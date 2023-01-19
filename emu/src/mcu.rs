@@ -1,9 +1,10 @@
 use crate::cpu::{CSRs, CPU};
-use crate::instructions::Instruction;
 use crate::instructions::{Exception, ExceptionInterrupt};
+use crate::instructions::{Instruction, Interrupt};
+use crate::interrupt_controller::InterruptController;
 use crate::memory::DeviceMap;
-use crate::memory::{Clocked, DeviceMeta, Memory, MMU};
-use crate::peripherals::Peripheral;
+use crate::memory::{DeviceMeta, Memory, MMU};
+use crate::peripherals::{Peripheral, PeripheralWrapper};
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::collections::BTreeMap;
 
@@ -16,9 +17,10 @@ pub struct DeviceDef {
 
 // Micro controller unit
 pub struct MCU {
-    cpu: CPU,
-    mmu: MMU,
-    devices: DeviceMap,
+    pub cpu: CPU,
+    pub int_ctrl: InterruptController,
+    pub mmu: MMU,
+    pub devices: DeviceMap,
 }
 
 impl MCU {
@@ -26,6 +28,7 @@ impl MCU {
         let devices = std::rc::Rc::new(std::cell::RefCell::new(BTreeMap::new()));
         Self {
             cpu: CPU::new(),
+            int_ctrl: InterruptController::new(std::rc::Rc::clone(&devices)),
             mmu: MMU::new(std::rc::Rc::clone(&devices)),
             devices,
         }
@@ -52,13 +55,13 @@ impl MCU {
     fn run_instruction(&mut self, word: u32) -> Result<u32, ExceptionInterrupt> {
         let v = if let Ok(v) = RVPrivileged::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            let cost = v.execute(&mut self.cpu, &mut self.mmu)?;
-            v.update_pc(&mut self.cpu);
+            let cost = v.execute(self)?;
+            v.update_pc(self);
             cost
         } else if let Ok(v) = RV32i::try_from(word) {
             log::trace!("instruction: {:?}", v);
-            let cost = v.execute(&mut self.cpu, &mut self.mmu)?;
-            v.update_pc(&mut self.cpu);
+            let cost = v.execute(self)?;
+            v.update_pc(self);
             cost
         } else {
             log::error!("error decoding instruction: {word:b} at {:x}", self.cpu.pc);
@@ -69,16 +72,14 @@ impl MCU {
     }
 
     pub fn tick(&mut self) -> TickResult {
-        self.mmu.tick(());
         {
-            let devices = self.devices.borrow();
-            for (_k, device) in devices.iter() {
+            let devices = std::rc::Rc::clone(&self.devices);
+            for (_k, device) in devices.borrow().iter() {
                 let deviceref = &mut *device.borrow_mut();
-                deviceref.tick(|_int_type, _id|
-                   // TODO: register the interrupt with the cpu
-                   todo!());
+                deviceref.tick(&mut self.int_ctrl);
             }
-        }
+            self.int_ctrl.notify_cpu(&mut self.cpu);
+        };
         let pc = self.cpu.pc;
         let word = self.mmu.rw(pc);
         let mstatus = self.cpu.get_csr(CSRs::mstatus as u32).unwrap();
@@ -107,6 +108,30 @@ impl MCU {
                 Exception::InstructionAccessFault,
             ))
         }
+    }
+
+    pub fn interrupt(&mut self, interrupt: Interrupt, id: u32) {
+        // If the PLIC is present, trigger external interrupts through it,
+        // otherwise do it directly
+        if interrupt == Interrupt::MExternalInterrupt {
+            if let Some(Ok(mut device)) = self
+                .devices
+                .borrow()
+                .get("PLIC")
+                .map(|d| d.try_borrow_mut())
+            {
+                let plic = <&mut dyn Peripheral as TryInto<
+                    PeripheralWrapper<&mut crate::peripherals::plic::PLIC>,
+                >>::try_into(&mut **device)
+                .unwrap();
+                let mut pending = plic.pending.borrow_mut();
+                *pending |= id as u64;
+            }
+        }
+
+        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
+        let mip_mei = mip | (1 << interrupt as u32);
+        self.cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
     }
 
     // Handles interrupts and exceptions
