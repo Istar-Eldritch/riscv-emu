@@ -1,10 +1,10 @@
 use crate::cpu::{CSRs, CPU};
+use crate::instructions::Instruction;
 use crate::instructions::{Exception, ExceptionInterrupt};
-use crate::instructions::{Instruction, Interrupt};
 use crate::interrupt_controller::InterruptController;
 use crate::memory::DeviceMap;
 use crate::memory::{DeviceMeta, Memory, MMU};
-use crate::peripherals::{Peripheral, PeripheralWrapper};
+use crate::peripherals::Peripheral;
 use riscv_isa_types::{privileged::RVPrivileged, rv32i::RV32i};
 use std::collections::BTreeMap;
 
@@ -108,30 +108,6 @@ impl MCU {
                 Exception::InstructionAccessFault,
             ))
         }
-    }
-
-    pub fn interrupt(&mut self, interrupt: Interrupt, id: u32) {
-        // If the PLIC is present, trigger external interrupts through it,
-        // otherwise do it directly
-        if interrupt == Interrupt::MExternalInterrupt {
-            if let Some(Ok(mut device)) = self
-                .devices
-                .borrow()
-                .get("PLIC")
-                .map(|d| d.try_borrow_mut())
-            {
-                let plic = <&mut dyn Peripheral as TryInto<
-                    PeripheralWrapper<&mut crate::peripherals::plic::PLIC>,
-                >>::try_into(&mut **device)
-                .unwrap();
-                let mut pending = plic.pending.borrow_mut();
-                *pending |= id as u64;
-            }
-        }
-
-        let mip = self.cpu.get_csr(CSRs::mip as u32).unwrap();
-        let mip_mei = mip | (1 << interrupt as u32);
-        self.cpu.set_csr(CSRs::mip as u32, mip_mei).unwrap();
     }
 
     // Handles interrupts and exceptions

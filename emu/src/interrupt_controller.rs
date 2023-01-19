@@ -1,7 +1,6 @@
 use crate::cpu::{CSRs, CPU};
 use crate::instructions::Interrupt;
 use crate::memory::DeviceMap;
-use crate::peripherals::{Peripheral, PeripheralWrapper};
 
 pub struct InterruptController {
     peripherals: DeviceMap,
@@ -21,15 +20,13 @@ impl InterruptController {
     pub fn interrupt(&mut self, interrupt: Interrupt, id: u32) {
         if interrupt == Interrupt::MExternalInterrupt {
             let peripherals = self.peripherals.borrow();
-            let plic_peripheral = peripherals
+            let peripheral = peripherals
                 .get("PLIC")
                 .ok_or(())
                 .and_then(|p| p.try_borrow_mut().map_err(|_| ()));
-            if let Ok(mut plic) = plic_peripheral {
-                if let Ok(plic) = <&mut dyn Peripheral as TryInto<
-                    PeripheralWrapper<&mut crate::peripherals::plic::PLIC>,
-                >>::try_into(&mut **plic)
-                {
+
+            if let Ok(mut peripheral) = peripheral {
+                if let Some(plic) = peripheral.as_plic() {
                     if plic.h0mie & id as u64 != 0 {
                         let mut pending = plic.pending.borrow_mut();
                         *pending |= id as u64;
@@ -96,15 +93,12 @@ impl InterruptController {
         self.interrupts = vec![];
 
         let peripherals = self.peripherals.borrow();
-        let plic_peripheral = peripherals
+        let peripheral = peripherals
             .get("PLIC")
             .ok_or(())
             .and_then(|p| p.try_borrow_mut().map_err(|_| ()));
-        if let Ok(mut plic) = plic_peripheral {
-            if let Ok(plic) = <&mut dyn Peripheral as TryInto<
-                PeripheralWrapper<&mut crate::peripherals::plic::PLIC>,
-            >>::try_into(&mut **plic)
-            {
+        if let Ok(mut peripheral) = peripheral {
+            if let Some(plic) = peripheral.as_plic() {
                 let mut pending = plic.pending.borrow_mut();
                 *pending = 0;
             }

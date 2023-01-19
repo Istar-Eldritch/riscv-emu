@@ -2,7 +2,6 @@ use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
 use crate::peripherals::Peripheral;
-use std::any::Any;
 use std::cell::RefCell;
 
 pub struct PLIC {
@@ -59,8 +58,8 @@ impl Clocked for PLIC {
 }
 
 impl Peripheral for PLIC {
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
+    fn as_plic(&mut self) -> Option<&mut Self> {
+        Some(self)
     }
 }
 

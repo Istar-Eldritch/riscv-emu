@@ -3,7 +3,6 @@ use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
 use crate::peripherals::Peripheral;
-use std::any::Any;
 
 pub struct CLINT {
     pub msip0: u32,    // addr 0
@@ -21,11 +20,7 @@ impl CLINT {
     }
 }
 
-impl Peripheral for CLINT {
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
-    }
-}
+impl Peripheral for CLINT {}
 
 impl Clocked for CLINT {
     /// Increases time, generates timer & software interrupts

@@ -3,7 +3,6 @@ use crate::interrupt_controller::InterruptController;
 use crate::memory::Clocked;
 use crate::memory::{Memory, MemoryError};
 use crate::peripherals::Peripheral;
-use std::any::Any;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
@@ -102,11 +101,7 @@ impl Clocked for UART {
     }
 }
 
-impl Peripheral for UART {
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
-    }
-}
+impl Peripheral for UART {}
 
 impl Memory for UART {
     fn rb(&self, _addr: u32) -> Result<u8, MemoryError> {

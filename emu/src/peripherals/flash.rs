@@ -1,7 +1,6 @@
 use crate::interrupt_controller::InterruptController;
 use crate::memory::{Clocked, GenericMemory, Memory, MemoryError};
 use crate::peripherals::Peripheral;
-use std::any::Any;
 
 pub struct Flash(GenericMemory);
 
@@ -11,11 +10,7 @@ impl Flash {
     }
 }
 
-impl Peripheral for Flash {
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
-    }
-}
+impl Peripheral for Flash {}
 
 impl Clocked for Flash {
     fn tick(&mut self, _: &mut InterruptController) {}
