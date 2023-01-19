@@ -30,12 +30,16 @@ impl InterruptController {
                     PeripheralWrapper<&mut crate::peripherals::plic::PLIC>,
                 >>::try_into(&mut **plic)
                 {
-                    let mut pending = plic.pending.borrow_mut();
-                    *pending |= id as u64;
+                    if plic.h0mie & id as u64 != 0 {
+                        let mut pending = plic.pending.borrow_mut();
+                        *pending |= id as u64;
+                        self.interrupts.push(interrupt);
+                    }
                 }
             }
+        } else {
+            self.interrupts.push(interrupt)
         }
-        self.interrupts.push(interrupt)
     }
 
     fn highest_priority_interrupt(&self) -> Option<Interrupt> {
