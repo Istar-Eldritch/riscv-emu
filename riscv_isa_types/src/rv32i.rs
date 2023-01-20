@@ -1,15 +1,16 @@
 use crate::format::{BFormat, IFormat, JFormat, RFormat, SFormat, UFormat, OPCODE_MASK};
+use macros::instruction;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RV32i {
     /// Load upper immediate
     /// Writes the sign-extended 20-bit immediate, left shifted by 12bits to x[rd] zeroin the lower
     /// 12 bit.
-    LUI(UFormat),
+    LUI(LUI),
     /// Add upper immediate to PC
     /// Adds the sign-extended 20bit immediate, left-shifted 12bit, to the pc, and writes the
     /// result to x[rd]
-    AUIPC(UFormat),
+    AUIPC(AUIPC),
     /// Jump and Link
     /// Writes the address of the next instruction (pc + 4) to x[rd]. then set hte pc to the
     /// current pc plus the sign-extended offset. If rd is omitted, x1 is used.
@@ -130,16 +131,32 @@ impl From<RV32i> for u32 {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+#[instruction(UFormat, op = 0b1110011)]
+pub struct LUI {
+    pub rd: u32,
+    pub imm: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[instruction(UFormat, op = 0b0010111)]
+pub struct AUIPC {
+    pub rd: u32,
+    pub imm: u32,
+}
+
 impl TryFrom<u32> for RV32i {
     type Error = ();
     fn try_from(word: u32) -> Result<Self, Self::Error> {
-        use RV32i::*;
+        if let Ok(lui) = LUI::try_from(word) {
+            return Ok(RV32i::LUI(lui));
+        } else if let Ok(auipc) = AUIPC::try_from(word) {
+            return Ok(RV32i::AUIPC(auipc));
+        }
         let opcode = word & OPCODE_MASK;
         match opcode {
-            0b0110111 => Ok(LUI(UFormat::from(word))),
-            0b0010111 => Ok(AUIPC(UFormat::from(word))),
-            0b1101111 => Ok(JAL(JFormat::from(word))),
-            0b1100111 => Ok(JALR(IFormat::from(word))),
+            0b1101111 => Ok(RV32i::JAL(JFormat::from(word))),
+            0b1100111 => Ok(RV32i::JALR(IFormat::from(word))),
             0b1100011 => branch(word),
             0b0000011 => load(word),
             0b0100011 => store(word),

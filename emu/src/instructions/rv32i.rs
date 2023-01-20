@@ -3,7 +3,7 @@ use crate::mcu::MCU;
 use crate::memory::Memory;
 use crate::utils::*;
 use riscv_isa_types::format::*;
-use riscv_isa_types::rv32i::RV32i;
+use riscv_isa_types::rv32i::*;
 
 use Exception::*;
 use ExceptionInterrupt::*;
@@ -12,8 +12,8 @@ impl Instruction for RV32i {
     fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt> {
         use RV32i::*;
         match *self {
-            LUI(f) => lui(mcu, f),
-            AUIPC(f) => auipc(mcu, f),
+            LUI(i) => i.execute(mcu),
+            AUIPC(i) => i.execute(mcu),
             JAL(f) => jal(mcu, f),
             JALR(f) => jalr(mcu, f),
             BEQ(f) => beq(mcu, f),
@@ -79,6 +79,29 @@ impl Instruction for RV32i {
     }
 }
 
+impl Instruction for LUI {
+    fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt> {
+        mcu.cpu.set_x(self.rd, sext(self.imm << 12, 32, 32));
+        Ok(1)
+    }
+    fn update_pc(&self, mcu: &mut MCU) {
+        mcu.cpu.pc += 4;
+    }
+}
+
+impl Instruction for AUIPC {
+    fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt> {
+        mcu.cpu.set_x(
+            self.rd,
+            ((mcu.cpu.pc as i32) + (sext(self.imm << 12, 32, 32)) as i32) as u32,
+        );
+        Ok(1)
+    }
+    fn update_pc(&self, mcu: &mut MCU) {
+        mcu.cpu.pc += 4;
+    }
+}
+
 fn ecall(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     // TODO: Environemnt calls on other privilege modes
     Err(ExceptionInterrupt::Exception(Exception::MEnvironmentCall))
@@ -86,21 +109,6 @@ fn ecall(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
 
 fn ebreak(_mcu: &mut MCU, _parsed: IFormat) -> Result<u32, ExceptionInterrupt> {
     Err(ExceptionInterrupt::Exception(Exception::Breakpoint))
-}
-
-/// Load Upper Immediate
-fn lui(mcu: &mut MCU, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    mcu.cpu.set_x(parsed.rd, sext(parsed.imm << 12, 32, 32));
-    Ok(1)
-}
-
-/// Add Upper Immediate to PC
-fn auipc(mcu: &mut MCU, parsed: UFormat) -> Result<u32, ExceptionInterrupt> {
-    mcu.cpu.set_x(
-        parsed.rd,
-        ((mcu.cpu.pc as i32) + (sext(parsed.imm << 12, 32, 32)) as i32) as u32,
-    );
-    Ok(1)
 }
 
 /// Jump and Link

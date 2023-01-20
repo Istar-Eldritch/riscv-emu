@@ -11,7 +11,7 @@ pub fn opcode(v: u32) -> u32 {
     v & OPCODE_MASK
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct RFormat {
     pub op: u32,
     pub rd: u32,
@@ -40,7 +40,7 @@ impl From<RFormat> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct IFormat {
     pub op: u32,
     pub rd: u32,
@@ -68,7 +68,7 @@ impl From<IFormat> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SFormat {
     pub op: u32,
     pub imm0: u32,
@@ -97,7 +97,7 @@ impl From<SFormat> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct BFormat {
     pub op: u32,
     pub imm0: u32,
@@ -136,7 +136,7 @@ impl From<BFormat> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct UFormat {
     pub op: u32,
     pub rd: u32,
@@ -159,7 +159,7 @@ impl From<UFormat> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct JFormat {
     pub op: u32,
     pub rd: u32,
