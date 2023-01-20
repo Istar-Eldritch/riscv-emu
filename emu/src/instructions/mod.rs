@@ -4,7 +4,9 @@ pub mod rv32i;
 
 pub trait Instruction: TryFrom<u32> + Into<u32> {
     fn execute(&self, mcu: &mut MCU) -> Result<u32, ExceptionInterrupt>;
-    fn update_pc(&self, mcu: &mut MCU) -> ();
+    fn update_pc(&self, mcu: &mut MCU) {
+        mcu.cpu.pc += 4;
+    }
 }
 
 // external

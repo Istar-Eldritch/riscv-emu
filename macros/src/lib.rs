@@ -1,3 +1,5 @@
+mod instruction_format;
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
@@ -22,4 +24,9 @@ pub fn mask(input: TokenStream) -> TokenStream {
     }
     let generated = quote!(#mask);
     TokenStream::from(generated)
+}
+
+#[proc_macro_attribute]
+pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
+    instruction_format::instruction(args, input)
 }
