@@ -3,6 +3,7 @@ use crate::memory::Memory;
 pub mod clint;
 pub mod flash;
 pub mod plic;
+pub mod rom;
 pub mod uart;
 
 pub trait Peripheral: Clocked + Memory {

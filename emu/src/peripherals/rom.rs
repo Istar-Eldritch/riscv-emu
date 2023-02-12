@@ -2,35 +2,37 @@ use crate::interrupt_controller::InterruptController;
 use crate::memory::{Clocked, GenericMemory, Memory, MemoryError};
 use crate::peripherals::Peripheral;
 
-pub struct Flash(GenericMemory);
+pub struct ROM(GenericMemory);
 
-impl Flash {
+impl ROM {
     pub fn new(size: u32) -> Self {
-        Self(GenericMemory::new(size))
-    }
-}
-
-impl From<Vec<u8>> for Flash {
-    fn from(v: Vec<u8>) -> Self {
-        let mut mem: GenericMemory = v.into();
-        mem.set_read_only(false);
+        let mut mem = GenericMemory::new(size);
+        mem.set_read_only(true);
         Self(mem)
     }
 }
 
-impl From<GenericMemory> for Flash {
+impl From<Vec<u8>> for ROM {
+    fn from(v: Vec<u8>) -> Self {
+        let mut memory: GenericMemory = v.into();
+        memory.set_read_only(true);
+        Self(memory)
+    }
+}
+
+impl From<GenericMemory> for ROM {
     fn from(mut v: GenericMemory) -> Self {
-        v.set_read_only(false);
+        v.set_read_only(true);
         Self(v)
     }
 }
 
-impl Peripheral for Flash {}
+impl Peripheral for ROM {}
 
-impl Clocked for Flash {
+impl Clocked for ROM {
     fn tick(&mut self, _: &mut InterruptController) {}
 }
-impl Memory for Flash {
+impl Memory for ROM {
     fn rb(&self, addr: u32) -> Result<u8, MemoryError> {
         self.0.rb(addr)
     }
