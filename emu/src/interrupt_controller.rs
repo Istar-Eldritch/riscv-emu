@@ -7,6 +7,12 @@ pub struct InterruptController {
     interrupts: Vec<Interrupt>,
 }
 
+impl std::fmt::Debug for InterruptController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InterruptController")
+    }
+}
+
 impl InterruptController {
     pub fn new(peripherals: DeviceMap) -> Self {
         Self {
